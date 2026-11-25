@@ -114,42 +114,7 @@ public sealed class BoPlatformClient : IBoPlatformClient
         return ParseEntry(XDocument.Parse(xml).Root);
     }
 
-    public async Task<List<BoSchedule>> GetSchedulesAsync(string token, int publicationId, CancellationToken ct = default)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"biprws/v1/infostore/{publicationId}/schedules");
-        request.Headers.TryAddWithoutValidation("X-SAP-LogonToken", token);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
-
-        using var response = await _http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-
-        var xml = await response.Content.ReadAsStringAsync(ct);
-        var feed = XDocument.Parse(xml).Root;
-        var schedules = new List<BoSchedule>();
-        if (feed == null) return schedules;
-
-        foreach (var entry in feed.Elements(Atom + "entry"))
-        {
-            var attrs = ParseAttrs(entry.Element(Atom + "content"));
-            schedules.Add(new BoSchedule
-            {
-                Id = ParseInt(attrs, "id") ?? 0,
-                ScheduleName = Attr(attrs, "schedulename"),
-                Owner = Attr(attrs, "owner"),
-                Status = Attr(attrs, "schedulestatus"),
-                UiStatus = Attr(attrs, "uistatus"),
-                Path = Attr(attrs, "path"),
-                NextRunTime = ParseBoDate(Attr(attrs, "nextruntime")),
-                StartTime = ParseBoDate(Attr(attrs, "starttime")),
-                EndTime = ParseBoDate(Attr(attrs, "endtime")),
-                Expiry = ParseBoDate(Attr(attrs, "expiry")),
-                Created = ParseBoDate(Attr(attrs, "created")),
-            });
-        }
-        return schedules;
-    }
-
-    public async Task<JsonElement?> CmsQueryFirstAsync(string token, string query, CancellationToken ct = default)
+    public async Task<List<JsonElement>> CmsQueryAsync(string token, string query, CancellationToken ct = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "biprws/v1/cmsquery")
         {
@@ -162,11 +127,17 @@ public sealed class BoPlatformClient : IBoPlatformClient
         response.EnsureSuccessStatusCode();
 
         using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-        if (!doc.RootElement.TryGetProperty("entries", out var entries)
-            || entries.ValueKind != JsonValueKind.Array
-            || entries.GetArrayLength() == 0)
-            return null;
-        return entries[0].Clone();
+        var entries = new List<JsonElement>();
+        if (doc.RootElement.TryGetProperty("entries", out var array) && array.ValueKind == JsonValueKind.Array)
+            foreach (var entry in array.EnumerateArray())
+                entries.Add(entry.Clone());
+        return entries;
+    }
+
+    public async Task<JsonElement?> CmsQueryFirstAsync(string token, string query, CancellationToken ct = default)
+    {
+        var entries = await CmsQueryAsync(token, query, ct);
+        return entries.Count > 0 ? entries[0] : null;
     }
 
     // ------------------------------------------------------------------ parsing
@@ -240,8 +211,6 @@ public sealed class BoPlatformClient : IBoPlatformClient
 
     private static string? TryGet(IReadOnlyDictionary<string, string> attrs, string name)
         => attrs.TryGetValue(name, out var value) && !string.IsNullOrEmpty(value) ? value : null;
-
-    private static int? ParseInt(IReadOnlyDictionary<string, string> attrs, string name) => TryParseInt(Attr(attrs, name));
 
     private static int? TryParseInt(string? value)
         => int.TryParse(value?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : null;

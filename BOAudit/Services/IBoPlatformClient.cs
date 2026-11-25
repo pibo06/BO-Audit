@@ -17,8 +17,8 @@ public interface IBoPlatformClient
     /// <summary>Lit un objet de l'infostore (nom du rapport, lien OpenDocument...).</summary>
     Task<Models.BoObject?> GetObjectAsync(string token, int id, CancellationToken ct = default);
 
-    /// <summary>Lit le calendrier (schedules) d'une publication.</summary>
-    Task<List<Models.BoSchedule>> GetSchedulesAsync(string token, int publicationId, CancellationToken ct = default);
+    /// <summary>Exécute une requête CMS QueryBuilder et retourne toutes les entrées du résultat (JSON).</summary>
+    Task<List<JsonElement>> CmsQueryAsync(string token, string query, CancellationToken ct = default);
 
     /// <summary>Exécute une requête CMS QueryBuilder et retourne la première entrée du résultat (JSON), sinon null.</summary>
     Task<JsonElement?> CmsQueryFirstAsync(string token, string query, CancellationToken ct = default);

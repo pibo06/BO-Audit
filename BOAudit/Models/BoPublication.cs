@@ -36,8 +36,6 @@ public sealed class BoPublication
     // --- Planning ---
     public string? ScheduleStatus { get; set; }
     public DateTime? NextRunTime { get; set; }
-    public BoSchedule? ActiveSchedule { get; set; }
-    public List<BoSchedule> Schedules { get; set; } = new();
 
     // --- Dernière exécution ---
     public DateTime? LastRunTime { get; set; }

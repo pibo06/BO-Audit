@@ -111,7 +111,7 @@ public sealed class BoAuditCache : IBoAuditCache
         }
     }
 
-    /// <summary>Récupère pour une publication : cmsquery (destinataires, rapport, dernière exécution), planning et historique.</summary>
+    /// <summary>Récupère pour une publication : cmsquery (destinataires, rapport, planning) puis l'historique des instances.</summary>
     private async Task EnrichAsync(string token, BoPublication publication, SemaphoreSlim throttle, CancellationToken ct)
     {
         try
@@ -122,14 +122,6 @@ public sealed class BoAuditCache : IBoAuditCache
                 var entry = await _bo.CmsQueryFirstAsync(token, $"SELECT * FROM CI_INFOOBJECTS WHERE SI_ID = {publication.Id}", ct);
                 if (entry is { } cmsEntry)
                     ApplyCmsEntry(publication, cmsEntry);
-
-                var schedules = await _bo.GetSchedulesAsync(token, publication.Id, ct);
-                publication.Schedules = schedules;
-                publication.ActiveSchedule = PickSchedule(schedules);
-                if (publication.NextRunTime == null && publication.ActiveSchedule != null)
-                    publication.NextRunTime = publication.ActiveSchedule.NextRunTime ?? publication.ActiveSchedule.StartTime;
-                if (publication.ScheduleStatus == null && publication.ActiveSchedule?.Status != null)
-                    publication.ScheduleStatus = publication.ActiveSchedule.Status;
 
                 await LoadSourceDocumentsAsync(token, publication, ct);
                 await LoadHistoryAsync(token, publication, ct);
@@ -188,6 +180,12 @@ public sealed class BoAuditCache : IBoAuditCache
             CollectStaticEmails(publication, ReadValues(options, "SI_MAIL_ADDRESSES"));
             CollectStaticEmails(publication, ReadValues(options, "SI_MAIL_CC"));
         }
+
+        // Planification : prochaine exécution et statut, si le CMS les renvoie dans SCHEDULING_INFO
+        publication.NextRunTime = BoPlatformClient.ParseBoDate(GetString(entry, "SCHEDULING_INFO", "SI_NEXT_RUN_TIME")) ?? publication.NextRunTime;
+        publication.ScheduleStatus = GetNumber(entry, "SCHEDULING_INFO", "SI_SCHEDULE_STATUS") is { } code
+            ? BoPlatformClient.DescribeScheduleStatus((int)code)
+            : publication.ScheduleStatus;
     }
 
     private void CollectStaticEmails(BoPublication publication, IEnumerable<string> addresses)
@@ -229,33 +227,35 @@ public sealed class BoAuditCache : IBoAuditCache
         }
     }
 
-    /// <summary>Historique des instances : la plus récente donne l'état du dernier envoi.</summary>
+    /// <summary>Historique des instances (méthode « Historique des Instances » du document de référence) :
+    /// une seule requête cmsquery SI_ANCESTOR renvoie les 20 dernières instances avec SI_STARTTIME, SI_ENDTIME et SI_SCHEDULE_STATUS.</summary>
     private async Task LoadHistoryAsync(string token, BoPublication publication, CancellationToken ct)
     {
         try
         {
-            var instances = await _bo.GetChildrenAsync(token, publication.Id, pageSize: 50, ct: ct);
-            publication.History = instances
-                .OrderByDescending(i => i.Updated)
-                .Take(10)
-                .Select(i => new BoInstance
-                {
-                    Id = i.Id,
-                    Cuid = i.Cuid,
-                    Name = i.Name,
-                    Updated = i.Updated,
-                    OpenDocumentLink = i.OpenDocumentLink,
-                })
+            var query = "SELECT TOP 20 SI_ID,SI_NAME,SI_STARTTIME,SI_ENDTIME,SI_SCHEDULE_STATUS FROM CI_INFOOBJECTS "
+                        + $"WHERE SI_INSTANCE=1 AND SI_KIND = 'Publication' AND SI_ANCESTOR = {publication.Id}";
+            var entries = await _bo.CmsQueryAsync(token, query, ct);
+
+            var instances = entries
+                .Select(ParseInstance)
+                .Where(i => i.Id != 0)
+                .OrderByDescending(i => i.StartTime ?? i.EndTime)
                 .ToList();
 
-            var last = publication.History.FirstOrDefault();
+            publication.History = instances;
+
+            var last = instances.FirstOrDefault();
             if (last != null)
             {
-                publication.LastRunTime ??= last.Updated;
-                if (last.OpenDocumentLink != null) publication.LastInstanceOpenLink = last.OpenDocumentLink;
-                var status = await GetInstanceStatusAsync(token, last.Id, ct);
-                last.Status = status;
-                publication.LastRunStatus ??= status;
+                publication.LastRunTime ??= last.EndTime ?? last.StartTime;
+                publication.LastRunStatus ??= last.Status;
+
+                if (publication.LastSuccessfulInstanceId is { } id)
+                {
+                    var obj = await _bo.GetObjectAsync(token, id, ct);
+                    publication.LastInstanceOpenLink ??= obj?.OpenDocumentLink;
+                }
             }
         }
         catch (Exception ex)
@@ -264,49 +264,52 @@ public sealed class BoAuditCache : IBoAuditCache
         }
     }
 
-    /// <summary>Lit le SI_SCHEDULE_STATUS de l'instance (requête CMS) pour connaître l'issue du dernier envoi.</summary>
-    private async Task<string?> GetInstanceStatusAsync(string token, int instanceId, CancellationToken ct)
+    /// <summary>Construit une instance depuis une entrée cmsquery (champs SI_*).</summary>
+    private static BoInstance ParseInstance(JsonElement entry)
     {
-        var entry = await _bo.CmsQueryFirstAsync(
-            token,
-            $"SELECT SI_ID, SI_NAME, SI_UPDATE_TS, SI_START_TIME, SI_END_TIME FROM CI_INFOOBJECTS WHERE SI_ID = {instanceId}",
-            ct);
-        if (entry == null) return null;
-
-        if (entry.Value.TryGetProperty("SCHEDULING_INFO", out var scheduling)
-            && scheduling.ValueKind == JsonValueKind.Object
-            && scheduling.TryGetProperty("SI_SCHEDULE_STATUS", out var statusEl)
-            && statusEl.ValueKind == JsonValueKind.Number)
-            return BoPlatformClient.DescribeScheduleStatus(statusEl.GetInt32());
-
-        return null;
-    }
-
-    /// <summary>Choisit la planification dont la prochaine exécution est la plus proche.</summary>
-    private static BoSchedule? PickSchedule(List<BoSchedule> schedules)
-    {
-        if (schedules.Count == 0) return null;
-        var now = DateTime.Now;
-        return schedules.Where(s => (s.NextRunTime ?? s.StartTime) >= now)
-            .OrderBy(s => s.NextRunTime ?? s.StartTime)
-            .FirstOrDefault()
-            ?? schedules.OrderBy(s => s.NextRunTime ?? s.StartTime).First();
+        var start = BoPlatformClient.ParseBoDate(GetString(entry, "SI_STARTTIME"));
+        var end = BoPlatformClient.ParseBoDate(GetString(entry, "SI_ENDTIME"));
+        var status = GetNumber(entry, "SI_SCHEDULE_STATUS") is { } code
+            ? BoPlatformClient.DescribeScheduleStatus((int)code)
+            : null;
+        return new BoInstance
+        {
+            Id = (int?)GetNumber(entry, "SI_ID") ?? 0,
+            Name = GetString(entry, "SI_NAME") ?? string.Empty,
+            StartTime = start,
+            EndTime = end,
+            Updated = end ?? start,
+            Status = status,
+        };
     }
 
     // ------------------------------------------------------------------ helpers JSON
 
-    private static string? GetString(JsonElement element, string name)
-        => element.ValueKind == JsonValueKind.Object
-            && element.TryGetProperty(name, out var value)
-            && value.ValueKind == JsonValueKind.String
-            && !string.IsNullOrEmpty(value.GetString())
-            ? value.GetString() : null;
+    private static string? GetString(JsonElement element, params string[] path)
+    {
+        var value = Navigate(element, path);
+        return value is { } v
+            && v.ValueKind == JsonValueKind.String
+            && !string.IsNullOrEmpty(v.GetString())
+            ? v.GetString() : null;
+    }
 
-    private static double? GetNumber(JsonElement element, string name)
-        => element.ValueKind == JsonValueKind.Object
-            && element.TryGetProperty(name, out var value)
-            && value.ValueKind == JsonValueKind.Number
-            && value.TryGetDouble(out var d) ? d : null;
+    private static double? GetNumber(JsonElement element, params string[] path)
+        => Navigate(element, path) is { } v
+            && v.ValueKind == JsonValueKind.Number
+            && v.TryGetDouble(out var d) ? d : null;
+
+    private static JsonElement? Navigate(JsonElement element, string[] path)
+    {
+        var current = element;
+        foreach (var part in path)
+        {
+            if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(part, out var next))
+                return null;
+            current = next;
+        }
+        return current;
+    }
 
     /// <summary>Itère les sous-objets numérotés d'une propriété ("1", "2", ...) ou d'un tableau.</summary>
     private static IEnumerable<JsonElement> ReadArray(JsonElement element, params string[] path)

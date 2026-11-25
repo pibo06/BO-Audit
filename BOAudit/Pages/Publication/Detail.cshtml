@@ -206,7 +206,7 @@
 
         <div class="col-lg-6">
             <div class="card h-100">
-                <div class="card-header">Historique des instances (10 dernières)</div>
+                <div class="card-header">Historique des instances (20 dernières)</div>
                 <div class="card-body">
                     @if (Publication.History.Count == 0)
                     {
@@ -245,36 +245,6 @@
                                                     <span class="badge bg-secondary">—</span>
                                                 }
                                             </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-
-                    @if (Publication.Schedules.Count > 0)
-                    {
-                        <h3 class="h6 mt-3">Planifications</h3>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Nom</th>
-                                        <th>Statut</th>
-                                        <th>Prochaine exécution</th>
-                                        <th>Période</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var schedule in Publication.Schedules)
-                                    {
-                                        <tr>
-                                            <td class="small">@schedule.ScheduleName (@schedule.Owner)</td>
-                                            <td>
-                                                <span class="badge @Display.StatusBadgeClass(schedule.Status)">@Display.StatusLabel(schedule.Status)</span>
-                                            </td>
-                                            <td>@Display.Date(schedule.NextRunTime)</td>
-                                            <td class="small">@Display.Date(schedule.StartTime) → @Display.Date(schedule.EndTime)</td>
                                         </tr>
                                     }
                                 </tbody>
