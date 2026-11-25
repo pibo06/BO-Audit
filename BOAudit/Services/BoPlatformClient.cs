@@ -177,6 +177,7 @@ public sealed class BoPlatformClient : IBoPlatformClient
         return new BoObject
         {
             Id = id.Value,
+            ParentId = TryParseInt(GetLink(entry, "up")?.Split('/').LastOrDefault()),
             Cuid = Attr(attrs, "cuid"),
             Name = TryGet(attrs, "name") ?? entry.Element(Atom + "title")?.Value ?? string.Empty,
             Description = Attr(attrs, "description"),

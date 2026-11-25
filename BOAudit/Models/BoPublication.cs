@@ -23,6 +23,9 @@ public sealed class BoPublication
     public int? RecipientsProviderDocumentId { get; set; }
     public string? RecipientsProviderDocumentName { get; set; }
 
+    /// <summary>Rapports source des destinataires dynamiques (SI_DYNAMIC_RECIPIENTS / SI_SOURCE_DOC_ID), avec leur dossier.</summary>
+    public List<BoRecipientsSource> RecipientsSources { get; set; } = new();
+
     // --- Destinataires ---
     /// <summary>Colonnes dynamiques définies (email, nom complet, identifiant...).</summary>
     public List<string> DynamicRecipientColumns { get; set; } = new();

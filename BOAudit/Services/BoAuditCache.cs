@@ -171,6 +171,14 @@ public sealed class BoAuditCache : IBoAuditCache
             AddIfPresent(columns, "Nom complet", GetString(dynamic.Value, "SI_USERFULLNAME"));
             AddIfPresent(columns, "Identifiant", GetString(dynamic.Value, "SI_USERNAME"));
             publication.DynamicRecipientColumns = columns;
+
+            // Rapports source des mappings de destinataires dynamiques (SI_SOURCE_DOC_ID)
+            foreach (var mapping in ReadArray(dynamic.Value, "SI_PERDOC_DYNAMIC_RECIPIENTS_PROFILE_MAPPINGS"))
+            {
+                var sourceDocId = (int?)GetNumber(mapping, "SI_SOURCE_DOC_ID");
+                if (sourceDocId != null && publication.RecipientsSources.All(s => s.Id != sourceDocId))
+                    publication.RecipientsSources.Add(new BoRecipientsSource { Id = sourceDocId.Value });
+            }
         }
 
         // Destinations SMTP : adresses statiques et CC
@@ -204,7 +212,8 @@ public sealed class BoAuditCache : IBoAuditCache
         }
     }
 
-    /// <summary>Résout le nom (et le lien OpenDocument) des rapports liés à la publication.</summary>
+    /// <summary>Résout le nom (et le lien OpenDocument) des rapports liés à la publication, et pour les
+    /// destinataires dynamiques le nom et le dossier de chaque rapport source (requêtes infostore).</summary>
     private async Task LoadSourceDocumentsAsync(string token, BoPublication publication, CancellationToken ct)
     {
         var ids = new List<int>();
@@ -212,10 +221,20 @@ public sealed class BoAuditCache : IBoAuditCache
         if (publication.RecipientsProviderDocumentId != null
             && !ids.Contains(publication.RecipientsProviderDocumentId.Value))
             ids.Add(publication.RecipientsProviderDocumentId.Value);
+        ids.AddRange(publication.RecipientsSources.Select(s => s.Id).Where(id => !ids.Contains(id)));
+
+        var objects = new Dictionary<int, BoObject>();
+        async Task<BoObject?> LoadObjectAsync(int id)
+        {
+            if (objects.TryGetValue(id, out var cached)) return cached;
+            var obj = await _bo.GetObjectAsync(token, id, ct);
+            if (obj != null) objects[id] = obj;
+            return obj;
+        }
 
         foreach (var id in ids)
         {
-            var obj = await _bo.GetObjectAsync(token, id, ct);
+            var obj = await LoadObjectAsync(id);
             if (obj == null) continue;
             if (publication.SourceDocumentId == id)
             {
@@ -224,6 +243,16 @@ public sealed class BoAuditCache : IBoAuditCache
             }
             if (publication.RecipientsProviderDocumentId == id)
                 publication.RecipientsProviderDocumentName = obj.Name;
+        }
+
+        // Destinataires dynamiques : nom du rapport source et nom de son dossier parent
+        foreach (var source in publication.RecipientsSources)
+        {
+            var obj = await LoadObjectAsync(source.Id);
+            if (obj == null) continue;
+            source.Name = obj.Name;
+            if (obj.ParentId is { } parentId && await LoadObjectAsync(parentId) is { } folder)
+                source.Folder = folder.Name;
         }
     }
 

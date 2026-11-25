@@ -148,6 +148,20 @@
                                 <li>Envoi SMTP aux destinataires dynamiques (%SI_EMAIL_ADDRESS%)</li>
                             }
                         </ul>
+
+                        @if (Publication.RecipientsSources.Count > 0)
+                        {
+                            <h3 class="h6">Rapport(s) source des destinataires dynamiques</h3>
+                            <ul class="small">
+                                @foreach (var source in Publication.RecipientsSources)
+                                {
+                                    <li>
+                                        @(source.Name ?? $"ID {source.Id}")
+                                        <span class="text-muted"> — Dossier : @(source.Folder ?? "inconnu")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
                     }
                     else
                     {
