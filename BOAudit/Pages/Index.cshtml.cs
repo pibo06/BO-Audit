@@ -1,0 +1,83 @@
+using System.Globalization;
+using BOAudit.Data;
+using BOAudit.Models;
+using BOAudit.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+
+namespace BOAudit.Pages;
+
+public class IndexModel(
+    IBoAuditCache cache,
+    ApplicationDbContext db) : PageModel
+{
+    public DateTime? LastRefresh { get; private set; }
+    public IReadOnlyList<BoPublication> Publications { get; private set; } = Array.Empty<BoPublication>();
+    public List<RecipientRow> Recipients { get; private set; } = new();
+
+    /// <summary>Vue demandée : "cartes" (défaut) ou "destinataires".</summary>
+    [BindProperty(SupportsGet = true)]
+    public string View { get; set; } = "cartes";
+
+    public string? ErrorMessage { get; private set; }
+
+    public async Task OnGetAsync()
+    {
+        LastRefresh = cache.LastRefresh;
+        ErrorMessage = cache.LastError;
+        Publications = cache.Publications;
+
+        if (View.Equals("destinataires", StringComparison.OrdinalIgnoreCase))
+        {
+            Recipients = await BuildRecipientsAsync();
+        }
+    }
+
+    public async Task<IActionResult> OnPostRefreshAsync()
+    {
+        var result = await cache.RefreshAsync();
+        TempData[result.Success ? "SuccessMessage" : "ErrorMessage"] = result.Message;
+        return RedirectToPage(new { view = View });
+    }
+
+    /// <summary>Rassemble tous les e-mails référencés dans les publications et les complète avec la base SQL (EF).</summary>
+    private async Task<List<RecipientRow>> BuildRecipientsAsync()
+    {
+        var rows = new Dictionary<string, RecipientRow>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var publication in cache.Publications)
+        {
+            foreach (var email in publication.StaticEmails)
+            {
+                if (!rows.TryGetValue(email, out var row))
+                    rows[email] = row = new RecipientRow { Email = email };
+                row.Publications.Add(publication.Name);
+            }
+        }
+
+        if (rows.Count == 0) return new List<RecipientRow>();
+
+        var emails = rows.Keys.ToList();
+        var fiches = await db.Destinataires
+            .Where(d => emails.Contains(d.Email))
+            .ToDictionaryAsync(d => d.Email.Trim().ToLower(CultureInfo.InvariantCulture), d => d, CancellationToken.None);
+
+        foreach (var (email, row) in rows)
+        {
+            if (fiches.TryGetValue(email.Trim().ToLower(CultureInfo.InvariantCulture), out var fiche))
+            {
+                row.Nom = fiche.Nom;
+                row.Prenom = fiche.Prenom;
+                row.MatriculeRh = fiche.MatriculeRh;
+                row.Sorti = fiche.Sorti;
+                row.FoundInDatabase = true;
+            }
+        }
+
+        return rows.Values
+            .OrderBy(r => r.Nom, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(r => r.Email, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+}

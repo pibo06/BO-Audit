@@ -1,0 +1,443 @@
+Récupération du <token> :
+
+	POST http://bo.lignesdazur.fr:8080/biprws/logon/long
+	HEADER : 	content/type		applicatio/json
+	BODY :
+	{
+	  "userName": "BO.username",
+	  "password": "BO.password",
+	  "auth": "secEnterprise"
+	}
+
+Libération du <token> :
+
+	POST http://bo.lignesdazur.fr:8080/biprws/logoff
+	HEADER : 	accept				application/xml
+				X-SAP-LogonToken	<token>
+
+Liste des publications : (Dossier public PUBLICATIONS dans la CMC avec ID=257219)
+
+	GET http://bo.lignesdazur.fr:8080/biprws/v1/infostore/257219/children?page=1&pagesize=500
+	HEADER :	X-SAP-LogonToken 	<token>
+
+	retourne une liste :
+		<entry>
+			<title type="text">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</title>
+			<author>
+				<name>teo.viglietti</name>
+				<uri>http://bo.lignesdazur.fr:8080/biprws/v1/infostore/9420</uri>
+			</author>
+			<updated>2026-02-16T13:45:16.516Z</updated>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200" rel="alternate"></link>
+			<content type="application/xml">
+				<attrs xmlns="http://www.sap.com/rws/bip">
+					<attr name="cuid" type="string">AVO0Ar9xoMNNjAxyEQyrtP4</attr>
+					<attr name="name" type="string">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</attr>
+					<attr name="description" type="string"></attr>
+					<attr name="id" type="string">806200</attr>
+					<attr name="type" type="string">Publication</attr>
+				</attrs>
+			</content>
+		</entry>
+		...
+		
+Détail d'une publication : (lien de l'objet précédent)
+
+	GET http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200
+	HEADER : 	X-SAP-LogonToken	<token>
+
+	retourne :
+		<entry xmlns="http://www.w3.org/2005/Atom">
+			<author>
+				<name>teo.viglietti</name>
+				<uri>http://bo.lignesdazur.fr:8080/biprws/v1/infostore/9420</uri>
+			</author>
+			<title type="text">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</title>
+			<updated>2026-02-16T13:45:16.516Z</updated>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/children" rel="http://www.sap.com/rws/bip#children" title="Children"></link>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/257219" rel="up"></link>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/schedules" rel="http://www.sap.com/rws/bip#schedule" title="Schedules"></link>
+			<content type="application/xml">
+				<attrs xmlns="http://www.sap.com/rws/bip">
+					<attr name="cuid" type="string">AVO0Ar9xoMNNjAxyEQyrtP4</attr>
+					<attr name="name" type="string">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</attr>
+					<attr name="description" type="string"></attr>
+					<attr name="id" type="string">806200</attr>
+					<attr name="type" type="string">Publication</attr>
+				</attrs>
+			</content>
+			<link href="http://vs-ap81.lignesdazur.local:8080/BOE/OpenDocument/opendoc/openDocument.jsp?sIDType=CUID&amp;iDocID=AVO0Ar9xoMNNjAxyEQyrtP4" rel="http://www.sap.com/rws/bip#opendocument" title="OpenDocument"></link>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/infostore/1343950" rel="http://www.sap.com/rws/bip#latest-instance" title="Latest instance"></link>
+		</entry>
+
+Historique des instances : (lien children de l'objet publication )
+
+	GET http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/children
+	HEADER : 	X-SAP-LogonToken	<token>
+
+	retourne une lise d'instances :
+		<entry>
+			<title type="text">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</title>
+			<author>
+				<name>teo.viglietti</name>
+				<uri>http://bo.lignesdazur.fr:8080/biprws/v1/infostore/9420</uri>
+			</author>
+			<updated>2026-08-31T04:00:59.013Z</updated>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/1198295" rel="alternate"></link>
+			<content type="application/xml">
+				<attrs xmlns="http://www.sap.com/rws/bip">
+					<attr name="cuid" type="string">AdpxzERJwbxMriMG6W89xAU</attr>
+					<attr name="name" type="string">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</attr>
+					<attr name="description" type="string"></attr>
+					<attr name="id" type="string">1198295</attr>
+					<attr name="type" type="string">Publication</attr>
+				</attrs>
+			</content>
+		</entry>
+		...
+
+Calendrier de la publication : ( lien schedules de l'objet publication )
+
+	GET http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/schedules
+	HEADER : 	X-SAP-LogonToken	<token>
+	
+	retourne :
+		<feed xmlns="http://www.w3.org/2005/Atom">
+			<title type="text">SCHEDULE_TITLE</title>
+			<updated>2026-11-24T10:07:46.509Z</updated>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/schedules?page=1&amp;pagesize=50" rel="self"></link>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/schedules?page=1&amp;pagesize=50" rel="first"></link>
+			<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/schedules?page=1&amp;pagesize=50" rel="last"></link>
+			<entry>
+				<title type="text">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</title>
+				<link href="http://bo.lignesdazur.fr:8080/biprws/v1/infostore/806200/schedules/806280"></link>
+				<content type="application/xml">
+					<attrs xmlns="http://www.sap.com/rws/bip">
+						<attr name="owner" type="string">teo.viglietti</attr>
+						<attr name="schedulestatus" type="string">En suspens</attr>
+						<attr name="opendoclink" type="string">http://VS-AP81.lignesdazur.local:6400/BOE/OpenDocument/opendoc/openDocument.jsp?sIDType=CUID&amp;iDocID=ASLAxBfQHHpPvxnVUJyq9RA</attr>
+						<attr name="cuid" type="string">ASLAxBfQHHpPvxnVUJyq9RA</attr>
+						<attr name="uistatus" type="string">Périodique</attr>
+						<attr name="created" type="string">16 févr. 2026 14:50</attr>
+						<attr name="endtime" type="string">16 févr. 2056 14:36</attr>
+						<attr name="nextruntime" type="string">30 nov. 2026 06:00</attr>
+						<attr name="starttime" type="string">23 févr. 2026 06:00</attr>
+						<attr name="type" type="string">Publication</attr>
+						<attr name="path" type="string">PUBLICATIONS/</attr>
+						<attr name="schedulename" type="string">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</attr>
+						<attr name="parentdocname" type="string">Synthèse suivi CR PUBLICATION HEBDOMADAIRE</attr>
+						<attr name="id" type="string">806280</attr>
+						<attr name="expiry" type="string">16 févr. 2056 14:36</attr>
+					</attrs>
+				</content>
+			</entry>
+		</feed>
+		
+Destinataires de la publication : (query builder sur l'ID de la publication )
+
+	POST http://bo.lignesdazur.fr:8080/biprws/v1/cmsquery
+	HEADER : 	X-SAP-LogonToken	<token>
+				content/type		applicatio/json
+	BODY :
+	{
+    "query":"SELECT * FROM CI_INFOOBJECTS WHERE SI_ID = 806200"
+	}
+	
+	Retourne :
+		{
+			"__metadata": {
+				"uri": "http://bo.lignesdazur.fr:8080/biprws/v1/cmsquery?page=1&pagesize=50"
+			},
+			"first": {
+				"__deferred": {
+					"uri": "http://bo.lignesdazur.fr:8080/biprws/v1/cmsquery?page=1&pagesize=50"
+				}
+			},
+			"last": {
+				"__deferred": {
+					"uri": "http://bo.lignesdazur.fr:8080/biprws/v1/cmsquery?page=1&pagesize=50"
+				}
+			},
+			"entries": [
+				{
+					"SI_DYNAMIC_RECIPIENTS": {
+						"SI_TOTAL": 0
+					},
+					"SI_DESCRIPTION": "",
+					"SI_EXCLUDED_DYNAMIC_RECIPIENTS": {
+						"SI_TOTAL": 0
+					},
+					"SI_READ_ONLY": false,
+					"SI_DYNAMIC_RECIPIENTS_PROFILE_VALUE_MAPPINGS": {
+						"SI_USERNAME": "Resp Secteur Id",
+						"SI_PERDOC_DYNAMIC_RECIPIENTS_PROFILE_MAPPINGS": {
+							"1": {
+								"SI_SOURCE_DOC_ID": 348727,
+								"SI_VARIABLE_MAPPINGS": {
+									"SI_TOTAL": 0
+								}
+							},
+							"2": {
+								"SI_SOURCE_DOC_ID": 806178,
+								"SI_VARIABLE_MAPPINGS": {
+									"1": {
+										"SI_VARIABLE": "Resp_Secteur_Id_via_FDR - SuiviCR",
+										"SI_SUBREPORTNAME": "",
+										"SI_ML_VARIABLE_ID": "DP0.DO39",
+										"SI_PROVIDER_COLUMN": 1,
+										"SI_INDEX": 1
+									},
+									"SI_TOTAL": 1
+								}
+							},
+							"SI_TOTAL": 2
+						},
+						"SI_EMAIL_ADDRESS": "Resp Secteur Mail",
+						"SI_USERFULLNAME": "Resp Secteur Nom Prénom",
+						"SI_PROVIDER_COLUMNS": {
+							"1": {
+								"SI_VARIABLE": "Resp Secteur Id",
+								"SI_INDEX": 1
+							},
+							"2": {
+								"SI_VARIABLE": "Resp Secteur Nom Prénom",
+								"SI_INDEX": 2
+							},
+							"3": {
+								"SI_VARIABLE": "Resp Secteur Mail",
+								"SI_INDEX": 3
+							},
+							"SI_TOTAL": 3
+						}
+					},
+					"SI_ID": 806200,
+					"SI_NAME": "Synthèse suivi CR PUBLICATION HEBDOMADAIRE",
+					"SI_KEYWORD": "",
+					"SI_PRINCIPALS_RERUN": {
+						"SI_TOTAL": 0
+					},
+					"SI_TABLE": 0,
+					"SI_HIDDEN_OBJECT": false,
+					"SI_FLAGS": 2050,
+					"SI_PSS_SERVICE": "PublicationSchedulingService",
+					"SI_DEFAULT_DESTINATION_PLUGIN_FORMATS": {
+						"SI_TOTAL": 0
+					},
+					"SI_OBTYPE": 68,
+					"SI_PUBLICATIONS": {
+						"SI_TOTAL": 0
+					},
+					"SI_SYSTEM_OBJECT": false,
+					"SI_PRINCIPALS": {
+						"SI_TOTAL": 0
+					},
+					"SI_IS_SCHEDULABLE": true,
+					"SI_EXCLUDED_PRINCIPALS": {
+						"SI_TOTAL": 0
+					},
+					"SI_OBJECT_IS_CONTAINER": false,
+					"SI_RUID": "AVO0Ar9xoMNNjAxyEQyrtP4",
+					"SI_CHILDREN": 21,
+					"SI_OWNER": "teo.viglietti",
+					"SI_PUBLICATION_EVENT_HANDLERS": {
+						"SI_ON_READ_RECIPIENTS": {
+							"1": {
+								"SI_OBJID": 348727,
+								"SI_DATACONNECTION": "Requête 1",
+								"SI_PUBLICATION_EVENT_PLUGINCLASS": "com.businessobjects.publisher.dynamicrecipients.rebean.REDataProvider"
+							},
+							"SI_TOTAL": 1
+						},
+						"SI_ON_POST_PROCESS_PERSONALIZED_DOCS": {
+							"SI_TOTAL": 0
+						}
+					},
+					"SI_RUNNABLE_OBJECT": false,
+					"SI_PARENT_FOLDER": 257219,
+					"SI_PUBLICATION_DOCUMENTS": {
+						"1": 806178,
+						"SI_TOTAL": 1
+					},
+					"SI_COMPONENT": false,
+					"SI_APPLICATION_OBJECT": false,
+					"SI_INSTANCE_OBJECT": false,
+					"SI_PUBLICATION_PROFILES": {
+						"SI_TOTAL": 0
+					},
+					"SI_GUID": "AVO0Ar9xoMNNjAxyEQyrtP4",
+					"SI_PUBLICATION_DOCUMENTPROFILE_TARGETS": {
+						"1": {
+							"SI_SOURCE_DOC_ID": 806178,
+							"SI_VARIABLE_MAPPINGS": {
+								"SI_TOTAL": 0
+							}
+						},
+						"SI_TOTAL": 1
+					},
+					"SI_INSTANCE": false,
+					"SI_CUID": "AVO0Ar9xoMNNjAxyEQyrtP4",
+					"SI_PARENTID": 257219,
+					"SI_PLUGIN_OBJECT": false,
+					"SI_OWNERID": 9420,
+					"SI_UPDATE_TS": "16 févr. 2026 14:45",
+					"SI_CREATION_TIME": "16 févr. 2026 14:27",
+					"SI_KIND": "Publication",
+					"SI_PROGID": "CrystalEnterprise.Publication",
+					"SI_PARENT_CUID": "AWeM03k64v9KtH1A2XVNgcY",
+					"SI_PARENT_FOLDER_CUID": "AWeM03k64v9KtH1A2XVNgcY",
+					"SI_SENDABLE": false,
+					"SI_SHORTCUTS": {
+						"SI_TOTAL": 0
+					},
+					"APOSDSSelectedDestinations": {
+						"DEST_COUNT": 0
+					},
+					"APOSDSInboxSelected": "N",
+					"SI_PLATFORM_SEARCH_CONTAINERS": {
+						"SI_TOTAL": 0
+					},
+					"SI_CRYPTOGRAPHIC_KEY": 0,
+					"SI_CORPORATE_CATEGORIES": {
+						"SI_TOTAL": 0
+					},
+					"SI_PERSONAL_CATEGORIES": {
+						"SI_TOTAL": 0
+					},
+					"SI_HAS_CHILDREN": true,
+					"SI_PUBLICATION_TYPE": "Webi",
+					"SI_TEMPLATE_CUID": "AVO0Ar9xoMNNjAxyEQyrtP4",
+					"SI_LAST_RUN_TIME": "23 nov. 2026 06:01",
+					"SI_LAST_SUCCESSFUL_INSTANCE_ID": 1343950,
+					"SI_TENANT_ID": 0,
+					"SI_SPECIFIC_KIND": "Publication",
+					"SI_SPECIFIC_PROGID": "CrystalEnterprise.Publication",
+					"SI_ARTIFACTS_SCOPEBATCH": {
+						"SI_TOTAL": 0
+					},
+					"SI_ARTIFACTS_SCOPEBATCHDOC": {
+						"SI_TOTAL": 0
+					},
+					"SI_SCOPEBATCHDOC_ARTIFACTS": {
+						"SI_TOTAL": 0
+					},
+					"SI_ARTIFACTS_SOURCEDOC": {
+						"SI_TOTAL": 0
+					},
+					"SI_ROLES_ON_OBJECT": {
+						"SI_TOTAL": 0
+					},
+					"SI_SOURCEDOC_ARTIFACTS": {
+						"SI_TOTAL": 0
+					},
+					"SI_TYPE": 0,
+					"SI_CLEANUP_SCOPEBATCH": true,
+					"SCHEDULING_INFO": {
+						"SI_RETRIES_ALLOWED": 0,
+						"SI_RETRY_INTERVAL": 1800,
+						"SI_NAME": "Synthèse suivi CR PUBLICATION HEBDOMADAIRE",
+						"SI_RUN_ON_TEMPLATE": {},
+						"SI_SCHEDULE_TYPE": 0,
+						"SI_SCHEDULE_INTERVAL_MINUTES": 0,
+						"SI_SCHED_NOW": true,
+						"SI_SCHEDULE_INTERVAL_HOURS": 0,
+						"SI_SCHEDULE_INTERVAL_MONTHS": 0,
+						"SI_SCHEDULE_INTERVAL_NTHDAY": 0,
+						"SI_CLEANUP": false,
+						"SI_DESTINATIONS": {
+							"1": {
+								"SI_DELIVER_PER_USER": true,
+								"SI_DESTINATION_PLUGIN_FORMATS": {
+									"SI_TOTAL": 0
+								},
+								"SI_PROGID": "CrystalEnterprise.Smtp",
+								"SI_DEST_SCHEDULEOPTIONS": {
+									"SI_MAIL_MESSAGE": "Veuillez trouver ci-joint la Synthèse suivi CR PUBLICATION HEBDOMADAIRE.\r\nLE SERVICE INFORMATIQUE\r\n\r\n-----------------------------------------------------------------------------------------------------------------------\r\n\r\nPrière de ne pas répondre à ce message, il s'agit d'un traitement automatisé.\r\nMERCI",
+									"SI_SENDER_NAME": "Service_Info_RLA@lignesdazur.fr",
+									"SI_MAIL_SUBJECT": "",
+									"SI_MAIL_ADDRESSES": {
+										"1": "%SI_EMAIL_ADDRESS%",
+										"SI_TOTAL": 1
+									},
+									"SI_MAIL_CC": {
+										"1": "teo.viglietti@lignesdazur.fr",
+										"2": "THIERRY.GUGLIELMI@lignesdazur.fr",
+										"3": "Najlaa.EZ-ZEROUALI@lignesdazur.fr",
+										"SI_TOTAL": 3
+									},
+									"SI_MAIL_BCC": {
+										"SI_TOTAL": 0
+									},
+									"SI_SMTP_ENABLEATTACHMENTS": true,
+									"SI_OUTPUT_FILES": {
+										"1": {
+											"SI_MIME_TYPE": "",
+											"SI_EMBED_NAME": "Synthèse suivi CR PUBLICATION HEBDOMADAIRE %SI_USERFULLNAME%.%EXT%"
+										},
+										"SI_TOTAL": 1
+									},
+									"SI_MAIL_REPLY_TO": {
+										"SI_TOTAL": 0
+									},
+									"SI_ADD_FILE_EXTENSION": true
+								}
+							},
+							"SI_TOTAL": 1
+						},
+						"SI_TIMEZONE_ID": 0,
+						"SI_OBJID": 806200,
+						"SI_ENDTIME": "16 févr. 2036 14:36",
+						"SI_TYPE": 68,
+						"SI_STARTTIME": "16 févr. 2026 13:36",
+						"SI_SCHEDULE_INTERVAL_NDAYS": 0,
+						"SI_NOTIFICATION": {
+							"SI_DESTINATION_FAILURE": {
+								"1": {
+									"SI_PROGID": "CrystalEnterprise.Smtp",
+									"SI_DEST_SCHEDULEOPTIONS": {}
+								},
+								"SI_TOTAL": 1
+							},
+							"SI_DESTINATION_SUCCESS": {
+								"SI_TOTAL": 0
+							}
+						}
+					},
+					"PROCESSING_INFO": {
+						"SI_OBJID": 806200,
+						"SI_PROCESSINFO_PER_DOC": {
+							"1": {
+								"SI_PUBLICATION_KEEP_SAVED_DATA": false,
+								"SI_FORMAT_INFOS": {
+									"1": {
+										"SI_FORMATINFO_DOCKIND": "Webi",
+										"SI_FORMAT": "Excel"
+									},
+									"2": {
+										"SI_FORMATINFO_DOCKIND": "Webi",
+										"SI_FORMAT": "PDF"
+									},
+									"SI_TOTAL": 2
+								},
+								"SI_PRECACHE_HTML": false,
+								"SI_PRECACHE_PDF": false,
+								"SI_PRECACHE_XLS": false,
+								"SI_REFRESH": false,
+								"SI_WEBI_PROMPTS": {
+									"SI_TOTAL": 0
+								},
+								"SI_SCHEDULING_DELIVERY_RULES": {},
+								"SI_HAS_PROMPTS": false,
+								"SI_DELIVERY_IF_SUCCESSFUL_REFRESH": false,
+								"SI_SOURCE_DOC_KIND": "Webi",
+								"SI_PROMPT_USER_VIEWING": false,
+								"SI_SOURCE_DOC_ID": 806178,
+								"SI_DELIVER_EMPTY_DOCUMENT": true,
+								"SI_DELIVERY_RULE_EXPRESSION": ""
+							},
+							"SI_TOTAL": 1
+						},
+						"SI_DELIVERY_RULE_OPTIONS": 2
+					}
+				}
+			]
+		}

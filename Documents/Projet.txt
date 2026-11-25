@@ -1,0 +1,24 @@
+Le web projet c# .net razor page a pour objectif de simplifier et de centraliser le suivi des plublications BO.
+Pour chaque publication active :
+- Quels sont les destinataires définis
+- Quel rapport est utilisé pur la publication dynamique
+- Quel est la prochaine date de publication
+- Quel est l'état de la dernière publication
+
+Le site sera accessible aux agents authentifiés windows appartenant à un groupe de sécurité défini dans l'appconfig
+La connection à BO se fera avec le compte windows de l'utilisateur, du mot de passe générique défini dans l'appconfig 
+L'url du serveur BO sera également définie dans l'appconfig 
+
+Les emails identifiées dans les publications seront completées par les informations issues d'une base de données SQL via entity
+- le modèle Destinataire est defini comme suit :
+	email			string(50)
+	matricule RH	string(6)
+	nom				string(50)
+	prenom			string(50)
+	sorti			boolean
+
+Sur la page d'accueil :
+Un bouton pour rafraichir les données BO (Publications, Destinataires....) affichant la date et l'heure de la dernière actualisation
+Une option permet d'afficher la liste des publications sous forme de cards avec des informations de base et un bouton pour accéder au détail.
+Une option permet d'afficher la liste des destinataires référencés dans les publications
+

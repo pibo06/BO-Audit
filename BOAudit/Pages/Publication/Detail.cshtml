@@ -1,0 +1,292 @@
+@page "{id:int}"
+@model DetailModel
+@using BOAudit.Models
+@{
+    ViewData["Title"] = Publication!.Name;
+}
+
+<div class="container">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-page="/Index">Suivi des publications BO</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@Publication.Name</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start mb-3">
+        <div>
+            <h1 class="h3 mb-1">@Publication.Name</h1>
+            <p class="text-muted mb-0">
+                @(string.IsNullOrEmpty(Publication.Description) ? "Pas de description" : Publication.Description)
+            </p>
+        </div>
+        <div class="text-end">
+            @if (Publication.OpenDocumentLink != null)
+            {
+                <a href="@Publication.OpenDocumentLink" class="btn btn-outline-primary" target="_blank" rel="noopener">Ouvrir dans BO</a>
+            }
+            <a asp-page="/Index" class="btn btn-secondary">Retour</a>
+        </div>
+    </div>
+
+    @if (Publication.Error != null)
+    {
+        <div class="alert alert-warning">
+            Cette publication n'a pas été entièrement analysée lors du dernier rafraîchissement : @Publication.Error
+        </div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Prochaine publication</h2>
+                    @if (Publication.NextRunTime is { } nextRun)
+                    {
+                        <p class="h5">@Display.Date(nextRun)</p>
+                    }
+                    else
+                    {
+                        <p class="h5 text-muted">Aucune planification</p>
+                    }
+                    @if (Publication.ScheduleStatus != null)
+                    {
+                        <span class="badge @Display.StatusBadgeClass(Publication.ScheduleStatus)">@Display.StatusLabel(Publication.ScheduleStatus)</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">État de la dernière publication</h2>
+                    <p class="h5">
+                        <span class="badge fs-6 @Display.StatusBadgeClass(Publication.LastRunStatus ?? Publication.ScheduleStatus)">
+                            @Display.StatusLabel(Publication.LastRunStatus ?? Publication.ScheduleStatus)
+                        </span>
+                    </p>
+                    <p class="small mb-1">
+                        @if (Publication.LastRunTime is { } last)
+                        {
+                            <text>Dernière exécution : @Display.Date(last)</text>
+                        }
+                        @if (Publication.LastInstanceOpenLink != null)
+                        {
+                            <text> — <a href="@Publication.LastInstanceOpenLink" target="_blank" rel="noopener">voir l'instance</a></text>
+                        }
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Rapport utilisé</h2>
+                    <p class="small">
+                        @if (Publication.SourceDocumentName != null)
+                        {
+                            <strong>Rapport de publication : </strong>
+                            @if (Publication.SourceDocumentOpenLink != null)
+                            {
+                                <a href="@Publication.SourceDocumentOpenLink" target="_blank" rel="noopener">@Publication.SourceDocumentName</a>
+                            }
+                            else
+                            {
+                                @Publication.SourceDocumentName
+                            }
+                            <br />
+                        }
+                        @if (Publication.RecipientsProviderDocumentName != null)
+                        {
+                            <strong>Rapport des destinataires dynamiques : </strong>@Publication.RecipientsProviderDocumentName
+                        }
+                        else if (Publication.SourceDocumentName == null)
+                        {
+                            <span class="text-muted">Renseigné après actualisation.</span>
+                        }
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Informations</h2>
+                    <ul class="list-unstyled small mb-0">
+                        <li>ID : @Publication.Id — CUID : @Publication.Cuid</li>
+                        <li>Auteur : @Publication.Author</li>
+                        <li>Type : Publication</li>
+                        <li>Dernière modification : @Display.Date(Publication.Updated)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Destinataires définis</div>
+                <div class="card-body">
+                    @if (Publication.DynamicRecipientColumns.Count > 0 || Publication.UsesDynamicSmtpRecipients)
+                    {
+                        <h3 class="h6">Destinataires dynamiques</h3>
+                        <p class="small">
+                            Résolus à chaque exécution à partir du rapport :
+                            <em>@(Publication.RecipientsProviderDocumentName ?? Publication.SourceDocumentName ?? "source dynamique")</em>
+                        </p>
+                        <ul class="small">
+                            @foreach (var column in Publication.DynamicRecipientColumns)
+                            {
+                                <li>@column</li>
+                            }
+                            @if (Publication.UsesDynamicSmtpRecipients)
+                            {
+                                <li>Envoi SMTP aux destinataires dynamiques (%SI_EMAIL_ADDRESS%)</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Aucun destinataire dynamique.</p>
+                    }
+
+                    <h3 class="h6">@Publication.StaticEmails.Count destinataire(s) statique(s)</h3>
+                    @if (Publication.StaticEmails.Count > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>E-mail</th>
+                                        <th>Nom</th>
+                                        <th>Prénom</th>
+                                        <th>Matricule RH</th>
+                                        <th>Sorti</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var recipient in Model.StaticRecipients)
+                                    {
+                                        <tr>
+                                            <td>@recipient.Email</td>
+                                            <td>@(recipient.Nom ?? "—")</td>
+                                            <td>@(recipient.Prenom ?? "—")</td>
+                                            <td>@(recipient.MatriculeRh ?? "—")</td>
+                                            <td>
+                                                @if (!recipient.FoundInDatabase)
+                                                {
+                                                    <span class="badge bg-warning text-dark">Non trouvé en base</span>
+                                                }
+                                                else if (recipient.Sorti == true)
+                                                {
+                                                    <span class="badge bg-danger">Oui</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success">Non</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Aucune adresse e-mail statique configurée dans les destinations SMTP.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Historique des instances (10 dernières)</div>
+                <div class="card-body">
+                    @if (Publication.History.Count == 0)
+                    {
+                        <p class="text-muted small">Aucune instance — la publication n'a jamais été exécutée.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Exécution</th>
+                                        <th>Instance</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var instance in Publication.History)
+                                    {
+                                        <tr>
+                                            <td>
+                                                @Display.Date(instance.Updated)
+                                                @if (instance.OpenDocumentLink != null)
+                                                {
+                                                    <a href="@instance.OpenDocumentLink" target="_blank" rel="noopener" class="ms-1" title="Ouvrir dans BO">&#128279;</a>
+                                                }
+                                            </td>
+                                            <td class="small">@instance.Name</td>
+                                            <td>
+                                                @if (instance.Status != null)
+                                                {
+                                                    <span class="badge @Display.StatusBadgeClass(instance.Status)">@Display.StatusLabel(instance.Status)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">—</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    @if (Publication.Schedules.Count > 0)
+                    {
+                        <h3 class="h6 mt-3">Planifications</h3>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Statut</th>
+                                        <th>Prochaine exécution</th>
+                                        <th>Période</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var schedule in Publication.Schedules)
+                                    {
+                                        <tr>
+                                            <td class="small">@schedule.ScheduleName (@schedule.Owner)</td>
+                                            <td>
+                                                <span class="badge @Display.StatusBadgeClass(schedule.Status)">@Display.StatusLabel(schedule.Status)</span>
+                                            </td>
+                                            <td>@Display.Date(schedule.NextRunTime)</td>
+                                            <td class="small">@Display.Date(schedule.StartTime) → @Display.Date(schedule.EndTime)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private BoPublication Publication => Model.Publication!;
+}
