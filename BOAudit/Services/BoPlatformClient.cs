@@ -140,6 +140,48 @@ public sealed class BoPlatformClient : IBoPlatformClient
         return entries.Count > 0 ? entries[0] : null;
     }
 
+    public async Task<List<JsonElement>> CmsQueryAllPagesAsync(string token, string query, CancellationToken ct = default)
+    {
+        var entries = new List<JsonElement>();
+        var next = await RunCmsQueryAsync(token, HttpMethod.Post, "biprws/v1/cmsquery", query, entries, ct);
+
+        // Suit les pages suivantes renvoyées par le QueryBuilder (URI « next.__deferred »).
+        for (var page = 2; next != null && page <= 100; page++)
+            next = await RunCmsQueryAsync(token, HttpMethod.Get, next, null, entries, ct);
+
+        return entries;
+    }
+
+    /// <summary>Exécute une requête cmsquery (POST initial ou GET de page suivante), ajoute les entrées
+    /// et retourne l'URI de la page suivante, sinon null.</summary>
+    private async Task<string?> RunCmsQueryAsync(string token, HttpMethod method, string path, string? query,
+        List<JsonElement> entries, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        request.Headers.TryAddWithoutValidation("X-SAP-LogonToken", token);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        if (query != null)
+            request.Content = JsonContent.Create(new { query });
+
+        using var response = await _http.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        var root = doc.RootElement;
+        if (root.TryGetProperty("entries", out var array) && array.ValueKind == JsonValueKind.Array)
+            foreach (var entry in array.EnumerateArray())
+                entries.Add(entry.Clone());
+
+        return root.TryGetProperty("next", out var next)
+               && next.TryGetProperty("__deferred", out var deferred)
+               && deferred.TryGetProperty("uri", out var uri)
+               && uri.GetString() is { } nextUri
+            ? _http.BaseAddress != null && nextUri.StartsWith(_http.BaseAddress.AbsoluteUri, StringComparison.OrdinalIgnoreCase)
+                ? nextUri[_http.BaseAddress.AbsoluteUri.Length..]
+                : nextUri
+            : null;
+    }
+
     // ------------------------------------------------------------------ parsing
 
     private async Task<List<BoObject>> GetFeedAsync(string token, string url, CancellationToken ct)

@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "Suivi des publications BO";
     var isRecipients = string.Equals(Model.View, "destinataires", StringComparison.OrdinalIgnoreCase);
+    var isPlanifications = string.Equals(Model.View, "planifications", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="container">
@@ -44,12 +45,82 @@
             }
         </span>
         <span class="ms-auto btn-group" role="group" aria-label="Choix de la vue">
-            <a asp-page="./Index" asp-route-view="cartes" class="btn btn-outline-secondary @(isRecipients ? "" : "active")">Publications</a>
+            <a asp-page="./Index" asp-route-view="cartes" class="btn btn-outline-secondary @(isRecipients || isPlanifications ? "" : "active")">Publications</a>
+            <a asp-page="./Index" asp-route-view="planifications" class="btn btn-outline-secondary @(isPlanifications ? "active" : "")">Planifications</a>
             <a asp-page="./Index" asp-route-view="destinataires" class="btn btn-outline-secondary @(isRecipients ? "active" : "")">Destinataires</a>
         </span>
     </div>
 
-    @if (!isRecipients)
+    @if (isPlanifications)
+    {
+        // ---- Vue planifications : documents Webi planifiés ----
+        @if (Model.Planifications.Count == 0)
+        {
+            <div class="alert alert-info">Aucune planification chargée. Lancez un rafraîchissement pour charger les planifications depuis BO.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Document</th>
+                            <th>Dossier</th>
+                            <th>Auteur</th>
+                            <th>Instances</th>
+                            <th>Récurrence</th>
+                            <th>Dernière exécution</th>
+                            <th>Format</th>
+                            <th>Destinataires</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var planification in Model.Planifications)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@planification.Name</strong>
+                                    @if (planification.HasPrompts)
+                                    {
+                                        <span class="badge bg-light text-dark border" title="Le document comporte des invites">invites</span>
+                                    }
+                                    @if (planification.Error != null)
+                                    {
+                                        <div class="small text-danger">Erreur : @planification.Error</div>
+                                    }
+                                </td>
+                                <td>@(planification.Folder ?? "—")</td>
+                                <td>@(string.IsNullOrEmpty(planification.Author) ? "—" : planification.Author)</td>
+                                <td>@planification.InstanceCount</td>
+                                <td>@(planification.Recurrence ?? "—")</td>
+                                <td>@(planification.LastRunTime is { } lastRun ? Display.Date(lastRun) : "jamais")</td>
+                                <td>@(planification.Format ?? "—")</td>
+                                <td>
+                                    @if (planification.UsesDynamicSmtpRecipients)
+                                    {
+                                        <span class="badge bg-info text-dark">dynamiques</span>
+                                    }
+                                    @foreach (var email in planification.StaticEmails.Take(3))
+                                    {
+                                        <span class="badge bg-light text-dark border">@email</span>
+                                    }
+                                    @if (planification.StaticEmails.Count > 3)
+                                    {
+                                        <span class="text-muted small">+@(planification.StaticEmails.Count - 3)</span>
+                                    }
+                                    @if (!planification.UsesDynamicSmtpRecipients && planification.StaticEmails.Count == 0)
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+    else if (!isRecipients)
     {
         // ---- Vue cartes : publications avec informations de base ----
         @if (Model.Publications.Count == 0)

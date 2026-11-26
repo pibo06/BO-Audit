@@ -20,6 +20,9 @@ public interface IBoPlatformClient
     /// <summary>Exécute une requête CMS QueryBuilder et retourne toutes les entrées du résultat (JSON).</summary>
     Task<List<JsonElement>> CmsQueryAsync(string token, string query, CancellationToken ct = default);
 
+    /// <summary>Exécute une requête CMS QueryBuilder en suivant les pages suivantes (« next ») et retourne toutes les entrées.</summary>
+    Task<List<JsonElement>> CmsQueryAllPagesAsync(string token, string query, CancellationToken ct = default);
+
     /// <summary>Exécute une requête CMS QueryBuilder et retourne la première entrée du résultat (JSON), sinon null.</summary>
     Task<JsonElement?> CmsQueryFirstAsync(string token, string query, CancellationToken ct = default);
 }

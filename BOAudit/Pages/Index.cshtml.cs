@@ -14,9 +14,10 @@ public class IndexModel(
 {
     public DateTime? LastRefresh { get; private set; }
     public IReadOnlyList<BoPublication> Publications { get; private set; } = Array.Empty<BoPublication>();
+    public IReadOnlyList<BoPlanification> Planifications { get; private set; } = Array.Empty<BoPlanification>();
     public List<RecipientRow> Recipients { get; private set; } = new();
 
-    /// <summary>Vue demandée : "cartes" (défaut) ou "destinataires".</summary>
+    /// <summary>Vue demandée : "cartes" (défaut), "planifications" ou "destinataires".</summary>
     [BindProperty(SupportsGet = true)]
     public string View { get; set; } = "cartes";
 
@@ -27,6 +28,7 @@ public class IndexModel(
         LastRefresh = cache.LastRefresh;
         ErrorMessage = cache.LastError;
         Publications = cache.Publications;
+        Planifications = cache.Planifications;
 
         if (View.Equals("destinataires", StringComparison.OrdinalIgnoreCase))
         {

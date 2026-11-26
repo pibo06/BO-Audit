@@ -12,6 +12,7 @@ public interface IBoAuditCache
 {
     DateTime? LastRefresh { get; }
     IReadOnlyList<BoPublication> Publications { get; }
+    IReadOnlyList<BoPlanification> Planifications { get; }
     BoPublication? Find(int id);
     Task<RefreshResult> RefreshAsync(CancellationToken ct = default);
     string? LastError { get; }
@@ -26,6 +27,7 @@ public sealed class BoAuditCache : IBoAuditCache
 
     private readonly object _lock = new();
     private List<BoPublication> _publications = new();
+    private List<BoPlanification> _planifications = new();
     private DateTime? _lastRefresh;
     private string? _lastError;
 
@@ -41,6 +43,7 @@ public sealed class BoAuditCache : IBoAuditCache
     public DateTime? LastRefresh { get { lock (_lock) return _lastRefresh; } }
     public string? LastError { get { lock (_lock) return _lastError; } }
     public IReadOnlyList<BoPublication> Publications { get { lock (_lock) return _publications; } }
+    public IReadOnlyList<BoPlanification> Planifications { get { lock (_lock) return _planifications; } }
     public BoPublication? Find(int id) { lock (_lock) return _publications.FirstOrDefault(p => p.Id == id); }
 
     public async Task<RefreshResult> RefreshAsync(CancellationToken ct = default)
@@ -50,17 +53,32 @@ public sealed class BoAuditCache : IBoAuditCache
             var token = await _bo.LogonAsync(ct);
             try
             {
+                // Les planifications sont chargées en parallèle de l'enrichissement des publications.
+                var planificationsTask = LoadPlanificationsAsync(token, ct);
+
                 var publications = await CollectPublicationsAsync(token, ct);
 
                 if (publications.Count == 0)
                 {
+                    var planificationsOnly = await planificationsTask;
+                    lock (_lock)
+                    {
+                        _planifications = planificationsOnly;
+                        _lastRefresh = DateTime.Now;
+                        _lastError = null;
+                    }
+                    Persist();
                     await _bo.LogoffAsync(token, ct);
-                    return new RefreshResult(false, $"Aucune publication trouvée dans les dossiers publics (racine {_settings.PublicFoldersRootId}).");
+                    return new RefreshResult(false,
+                        $"Aucune publication trouvée dans les dossiers publics (racine {_settings.PublicFoldersRootId})"
+                        + $" ; {planificationsOnly.Count} planification(s) chargée(s).");
                 }
 
                 using var throttle = new SemaphoreSlim(4);
                 var tasks = publications.Select(p => EnrichAsync(token, p, throttle, ct));
                 await Task.WhenAll(tasks);
+
+                var planifications = await planificationsTask;
 
                 var sorted = publications
                     .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
@@ -75,12 +93,13 @@ public sealed class BoAuditCache : IBoAuditCache
                 lock (_lock)
                 {
                     _publications = sorted;
+                    _planifications = planifications;
                     _lastRefresh = DateTime.Now;
                     _lastError = null;
                 }
                 Persist();
                 var errors = sorted.Count(p => !string.IsNullOrEmpty(p.Error));
-                var message = $"{sorted.Count} publication(s) actualisée(s) le {DateTime.Now:dd/MM/yyyy HH:mm}."
+                var message = $"{sorted.Count} publication(s) et {planifications.Count} planification(s) actualisée(s) le {DateTime.Now:dd/MM/yyyy HH:mm}."
                               + (errors > 0 ? $" {errors} publication(s) avec erreurs : ouvrez leur détail." : string.Empty);
                 await _bo.LogoffAsync(token, ct);
                 return new RefreshResult(true, message);
@@ -253,12 +272,10 @@ public sealed class BoAuditCache : IBoAuditCache
             : publication.ScheduleStatus;
     }
 
-    private void CollectStaticEmails(BoPublication publication, IEnumerable<string> addresses)
+    private static void CollectStaticEmails(BoPublication publication, IEnumerable<string> addresses)
     {
-        foreach (var raw in addresses)
+        foreach (var value in NormalizeAddresses(addresses))
         {
-            var value = raw.Trim();
-            if (value.Length == 0) continue;
             if (value.StartsWith('%') && value.EndsWith('%'))
             {
                 publication.UsesDynamicSmtpRecipients = true;
@@ -268,6 +285,24 @@ public sealed class BoAuditCache : IBoAuditCache
                 publication.StaticEmails.Add(value);
         }
     }
+
+    private static void CollectStaticEmails(BoPlanification planification, IEnumerable<string> addresses)
+    {
+        foreach (var value in NormalizeAddresses(addresses))
+        {
+            if (value.StartsWith('%') && value.EndsWith('%'))
+            {
+                planification.UsesDynamicSmtpRecipients = true;
+                continue;
+            }
+            if (value.Contains('@') && !planification.StaticEmails.Contains(value, StringComparer.OrdinalIgnoreCase))
+                planification.StaticEmails.Add(value);
+        }
+    }
+
+    /// <summary>Nettoie les adresses brutes (trim, ignore les vides) ; logique partagée par les deux collectes.</summary>
+    private static IEnumerable<string> NormalizeAddresses(IEnumerable<string> addresses)
+        => addresses.Select(a => a.Trim()).Where(a => a.Length > 0);
 
     /// <summary>Résout le nom (et le lien OpenDocument) des rapports liés à la publication, et pour les
     /// destinataires dynamiques le nom et le dossier de chaque rapport source (requêtes infostore).</summary>
@@ -369,6 +404,149 @@ public sealed class BoAuditCache : IBoAuditCache
         };
     }
 
+    /// <summary>Charge les planifications : documents Webi planifiés (méthode « Planifications » du document de
+    /// référence : SI_INSTANCE = 0, SI_KIND = 'Webi', SI_CHILDREN &gt; 0), avec récurrence, format et destinataires.</summary>
+    private async Task<List<BoPlanification>> LoadPlanificationsAsync(string token, CancellationToken ct)
+    {
+        try
+        {
+            var query = "SELECT * FROM CI_INFOOBJECTS WHERE SI_INSTANCE = 0 AND SI_KIND = 'Webi' AND SI_CHILDREN > 0";
+            var entries = await _bo.CmsQueryAllPagesAsync(token, query, ct);
+
+            var planifications = new List<BoPlanification>();
+            foreach (var entry in entries)
+            {
+                var planification = ParsePlanification(entry);
+                if (planification.Id != 0) planifications.Add(planification);
+            }
+
+            await ResolveFolderNamesAsync(token, planifications, ct);
+
+            return planifications.OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Chargement des planifications en échec");
+            return new List<BoPlanification>();
+        }
+    }
+
+    /// <summary>Construit une planification depuis une entrée cmsquery (champs SI_*).</summary>
+    private static BoPlanification ParsePlanification(JsonElement entry)
+    {
+        var planification = new BoPlanification
+        {
+            Id = (int?)GetNumber(entry, "SI_ID") ?? 0,
+            Cuid = GetString(entry, "SI_CUID") ?? string.Empty,
+            Name = GetString(entry, "SI_NAME") ?? string.Empty,
+            Description = GetString(entry, "SI_DESCRIPTION") ?? string.Empty,
+            Author = GetString(entry, "SI_AUTHOR") ?? GetString(entry, "SI_OWNER") ?? string.Empty,
+            Updated = BoPlatformClient.ParseBoDate(GetString(entry, "SI_UPDATE_TS")),
+            InstanceCount = (int?)GetNumber(entry, "SI_CHILDREN") ?? 0,
+            LastRunTime = BoPlatformClient.ParseBoDate(GetString(entry, "SI_LAST_RUN_TIME")),
+            ParentFolderId = (int?)GetNumber(entry, "SI_PARENT_FOLDER"),
+            Recurrence = DescribeRecurrence(entry),
+            Format = GetString(entry, "PROCESSING_INFO", "SI_FORMAT_INFO", "SI_FORMAT")
+                     ?? FormatFromProgid(GetString(entry, "SCHEDULING_INFO", "SI_PROGID_SCHEDULE")),
+            HasPrompts = GetBool(entry, "PROCESSING_INFO", "SI_HAS_PROMPTS"),
+        };
+
+        // Destinations SMTP : adresses statiques et CC
+        foreach (var destination in ReadArray(entry, "SCHEDULING_INFO", "SI_DESTINATIONS"))
+        {
+            if (!destination.TryGetProperty("SI_DEST_SCHEDULEOPTIONS", out var options)) continue;
+            CollectStaticEmails(planification, ReadValues(options, "SI_MAIL_ADDRESSES"));
+            CollectStaticEmails(planification, ReadValues(options, "SI_MAIL_CC"));
+        }
+
+        return planification;
+    }
+
+    /// <summary>Résout le nom des dossiers parents des planifications par lots (requêtes cmsquery).</summary>
+    private async Task ResolveFolderNamesAsync(string token, List<BoPlanification> planifications, CancellationToken ct)
+    {
+        var parentIds = planifications
+            .Select(p => p.ParentFolderId)
+            .Where(id => id is { } && id != 0)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        if (parentIds.Count == 0) return;
+
+        var names = new Dictionary<int, string>();
+        foreach (var chunk in parentIds.Chunk(50))
+        {
+            try
+            {
+                var query = "SELECT SI_ID, SI_NAME FROM CI_INFOOBJECTS WHERE SI_ID IN ("
+                            + string.Join(",", chunk) + ")";
+                foreach (var entry in await _bo.CmsQueryAsync(token, query, ct))
+                {
+                    var id = (int?)GetNumber(entry, "SI_ID");
+                    var name = GetString(entry, "SI_NAME");
+                    if (id != null && !string.IsNullOrEmpty(name)) names[id.Value] = name;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Résolution des noms de dossiers en échec pour {Count} dossier(s)", chunk.Length);
+            }
+        }
+
+        foreach (var planification in planifications)
+        {
+            if (planification.ParentFolderId is { } parentId && names.TryGetValue(parentId, out var folderName))
+                planification.Folder = folderName;
+        }
+    }
+
+    /// <summary>Décrit la récurrence de la planification (type, intervalles, jours du modèle).</summary>
+    private static string? DescribeRecurrence(JsonElement entry)
+    {
+        if (!entry.TryGetProperty("SCHEDULING_INFO", out var sched) || sched.ValueKind != JsonValueKind.Object)
+            return null;
+        if ((int?)GetNumber(sched, "SI_SCHEDULE_TYPE") is not { } type)
+            return null;
+
+        var parts = new List<string> { DescribeScheduleType(type) };
+        if (GetNumber(sched, "SI_SCHEDULE_INTERVAL_HOURS") is { } hours && hours > 0)
+            parts.Add($"toutes les {hours} h");
+        if (GetNumber(sched, "SI_SCHEDULE_INTERVAL_MINUTES") is { } minutes && minutes > 0)
+            parts.Add($"toutes les {minutes} min");
+        if (GetNumber(sched, "SI_SCHEDULE_INTERVAL_MONTHS") is { } months && months > 1)
+            parts.Add($"tous les {months} mois");
+        if (GetNumber(sched, "SI_SCHEDULE_INTERVAL_NTHDAY") is { } nth && nth > 0)
+            parts.Add($"le {nth}-ème jour");
+
+        if (Navigate(sched, new[] { "SI_RUN_ON_TEMPLATE", "SI_TEMPLATE_DAY1", "SI_DAYS_OF_WEEK" }) is { } days
+            && days.TryGetInt32(out var mask) && mask > 0)
+            parts.Add("jours : " + string.Join(", ", DecodeDaysOfWeek(mask)));
+
+        return string.Join(" — ", parts);
+    }
+
+    private static string DescribeScheduleType(int type) => type switch
+    {
+        0 => "Une fois (immédiat)",
+        1 => "Toutes les heures",
+        2 => "Tous les jours",
+        3 => "Toutes les semaines",
+        4 => "Tous les mois",
+        5 => "Mensuel (N-ième jour)",
+        8 => "Calendrier (jours définis)",
+        _ => $"Type {type}",
+    };
+
+    /// <summary>Décode le masque SI_DAYS_OF_WEEK : bit 1 = dimanche ... bit 64 = samedi.</summary>
+    private static string[] DecodeDaysOfWeek(int mask)
+    {
+        string[] days = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" };
+        return days.Where((_, i) => (mask & (1 << i)) != 0).ToArray();
+    }
+
+    private static string? FormatFromProgid(string? progid)
+        => string.IsNullOrEmpty(progid) || !progid.Contains('.') ? progid : progid.Split('.').Last().ToUpperInvariant();
+
     // ------------------------------------------------------------------ helpers JSON
 
     private static string? GetString(JsonElement element, params string[] path)
@@ -384,6 +562,11 @@ public sealed class BoAuditCache : IBoAuditCache
         => Navigate(element, path) is { } v
             && v.ValueKind == JsonValueKind.Number
             && v.TryGetDouble(out var d) ? d : null;
+
+    private static bool GetBool(JsonElement element, params string[] path)
+        => Navigate(element, path) is { } v
+            && (v.ValueKind == JsonValueKind.True
+                || (v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var d) && d != 0));
 
     private static JsonElement? Navigate(JsonElement element, string[] path)
     {
@@ -472,6 +655,7 @@ public sealed class BoAuditCache : IBoAuditCache
     {
         public DateTime? LastRefresh { get; set; }
         public List<BoPublication> Publications { get; set; } = new();
+        public List<BoPlanification> Planifications { get; set; } = new();
     }
 
     private string CachePath => Path.Combine(_environment.ContentRootPath, "App_Data", "bo-cache.json");
@@ -483,7 +667,7 @@ public sealed class BoAuditCache : IBoAuditCache
             lock (_lock)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(CachePath)!);
-                var snapshot = new Snapshot { LastRefresh = _lastRefresh, Publications = _publications };
+                var snapshot = new Snapshot { LastRefresh = _lastRefresh, Publications = _publications, Planifications = _planifications };
                 File.WriteAllText(CachePath, JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true }));
             }
         }
@@ -503,10 +687,11 @@ public sealed class BoAuditCache : IBoAuditCache
             lock (_lock)
             {
                 _publications = snapshot.Publications;
+                _planifications = snapshot.Planifications;
                 _lastRefresh = snapshot.LastRefresh;
             }
-            _logger.LogInformation("Cache BO initialisé depuis {Path} : {Count} publication(s), dernière actualisation {LastRefresh}",
-                CachePath, snapshot.Publications.Count, snapshot.LastRefresh);
+            _logger.LogInformation("Cache BO initialisé depuis {Path} : {Count} publication(s), {Planifications} planification(s), dernière actualisation {LastRefresh}",
+                CachePath, snapshot.Publications.Count, snapshot.Planifications.Count, snapshot.LastRefresh);
         }
         catch (Exception ex)
         {
