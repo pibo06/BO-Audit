@@ -20,6 +20,10 @@ public sealed class BoSettings
     /// <summary>ID du dossier public CMC contenant les publications (257219).</summary>
     public int PublicationsFolderId { get; set; } = 257219;
 
+    /// <summary>ID du dossier racine des dossiers publics (23, valeur standard BO).
+    /// Les publications sont recherchées dans tous les dossiers de premier niveau, récursivement.</summary>
+    public int PublicFoldersRootId { get; set; } = 23;
+
     /// <summary>Taille de page des requêtes infostore.</summary>
     public int PageSize { get; set; } = 500;
     /// <summary>Taille de page des requêtes infostore.</summary>

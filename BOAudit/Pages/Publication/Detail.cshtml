@@ -9,6 +9,10 @@
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a asp-page="/Index">Suivi des publications BO</a></li>
+            @if (!string.IsNullOrEmpty(Publication.Folder))
+            {
+                <li class="breadcrumb-item">@Publication.Folder</li>
+            }
             <li class="breadcrumb-item active" aria-current="page">@Publication.Name</li>
         </ol>
     </nav>

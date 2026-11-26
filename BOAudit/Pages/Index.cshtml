@@ -105,6 +105,10 @@
                                 <a asp-page="/Publication/Detail" asp-route-id="@publication.Id" class="btn btn-sm btn-primary">Voir le détail</a>
                             </div>
                             <div class="card-footer small text-muted">
+                                @if (!string.IsNullOrEmpty(publication.Folder))
+                                {
+                                    <text>Dossier : <strong>@publication.Folder</strong> — </text>
+                                }
                                 Auteur : @publication.Author — Modifié : @Display.Date(publication.Updated)
                             </div>
                         </div>

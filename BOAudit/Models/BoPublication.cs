@@ -14,6 +14,9 @@ public sealed class BoPublication
     public DateTime? Updated { get; set; }
     public string? OpenDocumentLink { get; set; }
 
+    /// <summary>Dossier public de premier niveau contenant la publication.</summary>
+    public string? Folder { get; set; }
+
     // --- Rapport utilisé pour la publication ---
     public int? SourceDocumentId { get; set; }
     public string? SourceDocumentName { get; set; }

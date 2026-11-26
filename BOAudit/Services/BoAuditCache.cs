@@ -50,25 +50,12 @@ public sealed class BoAuditCache : IBoAuditCache
             var token = await _bo.LogonAsync(ct);
             try
             {
-                var children = await _bo.GetChildrenAsync(token, _settings.PublicationsFolderId, pageSize: _settings.PageSize, ct: ct);
-                var publications = children
-                    .Where(o => o.Type.Equals("Publication", StringComparison.OrdinalIgnoreCase))
-                    .Select(o => new BoPublication
-                    {
-                        Id = o.Id,
-                        Cuid = o.Cuid,
-                        Name = o.Name,
-                        Description = o.Description,
-                        Author = o.Author,
-                        Updated = o.Updated,
-                        OpenDocumentLink = o.OpenDocumentLink,
-                    })
-                    .ToList();
+                var publications = await CollectPublicationsAsync(token, ct);
 
                 if (publications.Count == 0)
                 {
                     await _bo.LogoffAsync(token, ct);
-                    return new RefreshResult(false, $"Aucune publication trouvée dans le dossier {_settings.PublicationsFolderId} ({children.Count} objets).");
+                    return new RefreshResult(false, $"Aucune publication trouvée dans les dossiers publics (racine {_settings.PublicFoldersRootId}).");
                 }
 
                 using var throttle = new SemaphoreSlim(4);
@@ -108,6 +95,58 @@ public sealed class BoAuditCache : IBoAuditCache
             _logger.LogError(ex, "Échec du rafraîchissement des données BO");
             lock (_lock) _lastError = ex.Message;
             return new RefreshResult(false, "Échec du rafraîchissement : " + ex.Message);
+        }
+    }
+
+    /// <summary>Parcourt les dossiers publics de premier niveau et rassemble toutes les publications,
+    /// avec le nom de leur dossier public de premier niveau (recherche récursive, avec pagination).</summary>
+    private async Task<List<BoPublication>> CollectPublicationsAsync(string token, CancellationToken ct)
+    {
+        var publications = new List<BoPublication>();
+        var visited = new HashSet<int>();
+
+        var root = await _bo.GetObjectAsync(token, _settings.PublicFoldersRootId, ct)
+                   ?? new BoObject { Id = _settings.PublicFoldersRootId, Name = "Dossiers publics" };
+        var firstLevel = await GetChildrenAllPagesAsync(token, root.Id, ct);
+
+        foreach (var folder in firstLevel.Where(o => o.Type.Equals("Folder", StringComparison.OrdinalIgnoreCase)))
+            await ScanFolderAsync(token, folder.Id, folder.Name, publications, visited, ct);
+
+        return publications;
+    }
+
+    private async Task ScanFolderAsync(string token, int folderId, string folderName,
+        List<BoPublication> publications, HashSet<int> visited, CancellationToken ct)
+    {
+        if (!visited.Add(folderId)) return;
+
+        foreach (var child in await GetChildrenAllPagesAsync(token, folderId, ct))
+        {
+            if (child.Type.Equals("Folder", StringComparison.OrdinalIgnoreCase))
+                await ScanFolderAsync(token, child.Id, folderName, publications, visited, ct);
+            else if (child.Type.Equals("Publication", StringComparison.OrdinalIgnoreCase))
+                publications.Add(new BoPublication
+                {
+                    Id = child.Id,
+                    Cuid = child.Cuid,
+                    Name = child.Name,
+                    Description = child.Description,
+                    Author = child.Author,
+                    Updated = child.Updated,
+                    OpenDocumentLink = child.OpenDocumentLink,
+                    Folder = folderName,
+                });
+        }
+    }
+
+    private async Task<List<BoObject>> GetChildrenAllPagesAsync(string token, int folderId, CancellationToken ct)
+    {
+        var result = new List<BoObject>();
+        for (var page = 1; ; page++)
+        {
+            var children = await _bo.GetChildrenAsync(token, folderId, page, _settings.PageSize, ct);
+            result.AddRange(children);
+            if (children.Count < _settings.PageSize) return result;
         }
     }
 
