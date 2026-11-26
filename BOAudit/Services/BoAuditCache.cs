@@ -151,29 +151,47 @@ public sealed class BoAuditCache : IBoAuditCache
         var sourceIds = ReadIndexedIds(entry, "SI_PUBLICATION_DOCUMENTS");
         publication.SourceDocumentId = sourceIds.FirstOrDefault();
 
-        // Rapport fournisseur des destinataires dynamiques (SI_ON_READ_RECIPIENTS)
-        foreach (var handler in ReadArray(entry, "SI_ON_READ_RECIPIENTS"))
+        // Rapport fournisseur des destinataires dynamiques (SI_PUBLICATION_EVENT_HANDLERS / SI_ON_READ_RECIPIENTS)
+        var handlerPaths = new[]
         {
-            var objId = GetNumber(handler, "SI_OBJID");
-            if (objId != null)
+            new[] { "SI_PUBLICATION_EVENT_HANDLERS", "SI_ON_READ_RECIPIENTS" },
+            new[] { "SI_ON_READ_RECIPIENTS" },
+        };
+        foreach (var handlerPath in handlerPaths)
+        {
+            foreach (var handler in ReadArray(entry, handlerPath))
             {
-                publication.RecipientsProviderDocumentId = (int)objId;
-                break;
+                var objId = GetNumber(handler, "SI_OBJID");
+                if (objId != null)
+                {
+                    publication.RecipientsProviderDocumentId = (int)objId;
+                    break;
+                }
             }
+            if (publication.RecipientsProviderDocumentId != null) break;
         }
 
-        // Destinataires dynamiques : colonnes du rapport (email, nom complet, identifiant)
-        var dynamic = entry.TryGetProperty("SI_DYNAMIC_RECIPIENTS", out var dyn) ? dyn : (JsonElement?)null;
-        if (dynamic != null && dynamic.Value.ValueKind == JsonValueKind.Object)
+        // Destinataires dynamiques : colonnes du rapport (email, nom complet, identifiant) et rapports source.
+        // Le CMS renvoie ces données dans SI_DYNAMIC_RECIPIENTS_PROFILE_VALUE_MAPPINGS ;
+        // SI_DYNAMIC_RECIPIENTS ne contient que SI_TOTAL.
+        var dynMappings = entry.TryGetProperty("SI_DYNAMIC_RECIPIENTS_PROFILE_VALUE_MAPPINGS", out var dvm)
+                          && dvm.ValueKind == JsonValueKind.Object ? dvm : (JsonElement?)null;
+        if (dynMappings == null
+            && entry.TryGetProperty("SI_DYNAMIC_RECIPIENTS", out var dyn0)
+            && dyn0.ValueKind == JsonValueKind.Object)
+            dynMappings = dyn0;
+
+        if (dynMappings != null)
         {
+            var dynamic = dynMappings.Value;
             var columns = new List<string>();
-            AddIfPresent(columns, "E-mail", GetString(dynamic.Value, "SI_EMAIL_ADDRESS"));
-            AddIfPresent(columns, "Nom complet", GetString(dynamic.Value, "SI_USERFULLNAME"));
-            AddIfPresent(columns, "Identifiant", GetString(dynamic.Value, "SI_USERNAME"));
+            AddIfPresent(columns, "E-mail", GetString(dynamic, "SI_EMAIL_ADDRESS"));
+            AddIfPresent(columns, "Nom complet", GetString(dynamic, "SI_USERFULLNAME"));
+            AddIfPresent(columns, "Identifiant", GetString(dynamic, "SI_USERNAME"));
             publication.DynamicRecipientColumns = columns;
 
             // Rapports source des mappings de destinataires dynamiques (SI_SOURCE_DOC_ID)
-            foreach (var mapping in ReadArray(dynamic.Value, "SI_PERDOC_DYNAMIC_RECIPIENTS_PROFILE_MAPPINGS"))
+            foreach (var mapping in ReadArray(dynamic, "SI_PERDOC_DYNAMIC_RECIPIENTS_PROFILE_MAPPINGS"))
             {
                 var sourceDocId = (int?)GetNumber(mapping, "SI_SOURCE_DOC_ID");
                 if (sourceDocId != null && publication.RecipientsSources.All(s => s.Id != sourceDocId))
