@@ -182,7 +182,7 @@
                                         <th>E-mail</th>
                                         <th>Nom</th>
                                         <th>Prénom</th>
-                                        <th>Sorti</th>
+                                        <th>Sortie</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -194,18 +194,7 @@
                                             <td>@(recipient.Nom ?? "—")</td>
                                             <td>@(recipient.Prenom ?? "—")</td>
                                             <td>
-                                                @if (!recipient.FoundInDatabase)
-                                                {
-                                                    <span class="badge bg-warning text-dark">Non trouvé</span>
-                                                }
-                                                else if (recipient.Sorti == true)
-                                                {
-                                                    <span class="badge bg-danger">Oui</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="badge bg-success">Non</span>
-                                                }
+                                                @(recipient.DateSortie is { } sortie ? Display.Date(sortie) : "")
                                             </td>
                                         </tr>
                                     }

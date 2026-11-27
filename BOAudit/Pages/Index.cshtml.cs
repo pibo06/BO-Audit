@@ -82,7 +82,7 @@ public class IndexModel(
             {
                 row.Nom = fiche.Nom;
                 row.Prenom = fiche.Prenom;
-                row.Sorti = fiche.DateSortie.HasValue;
+                row.DateSortie = fiche.DateSortie;
                 row.FoundInDatabase = true;
             }
         }
