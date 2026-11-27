@@ -54,7 +54,7 @@ public class IndexModel(
             {
                 if (!rows.TryGetValue(email, out var row))
                     rows[email] = row = new RecipientRow { Email = email };
-                row.Publications.Add(publication.Name);
+                row.Publications.Add(new EnvoiRef(publication.Id, publication.Name));
             }
         }
 
@@ -64,7 +64,7 @@ public class IndexModel(
             {
                 if (!rows.TryGetValue(email, out var row))
                     rows[email] = row = new RecipientRow { Email = email };
-                row.Planifications.Add(planification.Name);
+                row.Planifications.Add(new EnvoiRef(planification.Id, planification.Name));
             }
         }
 

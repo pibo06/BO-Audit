@@ -14,6 +14,7 @@ public interface IBoAuditCache
     IReadOnlyList<BoPublication> Publications { get; }
     IReadOnlyList<BoPlanification> Planifications { get; }
     BoPublication? Find(int id);
+    BoPlanification? FindPlanification(int id);
     Task<RefreshResult> RefreshAsync(CancellationToken ct = default);
     string? LastError { get; }
 }
@@ -45,6 +46,7 @@ public sealed class BoAuditCache : IBoAuditCache
     public IReadOnlyList<BoPublication> Publications { get { lock (_lock) return _publications; } }
     public IReadOnlyList<BoPlanification> Planifications { get { lock (_lock) return _planifications; } }
     public BoPublication? Find(int id) { lock (_lock) return _publications.FirstOrDefault(p => p.Id == id); }
+    public BoPlanification? FindPlanification(int id) { lock (_lock) return _planifications.FirstOrDefault(p => p.Id == id); }
 
     public async Task<RefreshResult> RefreshAsync(CancellationToken ct = default)
     {
@@ -431,12 +433,53 @@ public sealed class BoAuditCache : IBoAuditCache
 
             await ResolveFolderNamesAsync(token, planifications, ct);
 
+            // Historique des instances, chargé en parallèle (limité) comme pour les publications.
+            using var throttle = new SemaphoreSlim(4);
+            await Task.WhenAll(planifications.Select(p => LoadPlanificationHistoryAsync(token, p, throttle, ct)));
+
             return planifications.OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Chargement des planifications en échec");
             return new List<BoPlanification>();
+        }
+    }
+
+    /// <summary>Historique des instances d'un document planifié : requête cmsquery SI_ANCESTOR
+    /// renvoyant les 20 dernières instances avec SI_STARTTIME, SI_ENDTIME et SI_SCHEDULE_STATUS.</summary>
+    private async Task LoadPlanificationHistoryAsync(string token, BoPlanification planification, SemaphoreSlim throttle, CancellationToken ct)
+    {
+        try
+        {
+            await throttle.WaitAsync(ct);
+            try
+            {
+                var query = "SELECT TOP 20 SI_ID,SI_NAME,SI_STARTTIME,SI_ENDTIME,SI_SCHEDULE_STATUS FROM CI_INFOOBJECTS "
+                            + $"WHERE SI_INSTANCE=1 AND SI_KIND = 'Webi' AND SI_ANCESTOR = {planification.Id}";
+                var entries = await _bo.CmsQueryAsync(token, query, ct);
+
+                planification.History = entries
+                    .Select(ParseInstance)
+                    .Where(i => i.Id != 0)
+                    .OrderByDescending(i => i.StartTime ?? i.EndTime)
+                    .ToList();
+
+                var last = planification.History.FirstOrDefault();
+                if (last != null)
+                {
+                    planification.LastRunTime ??= last.EndTime ?? last.StartTime;
+                    planification.LastRunStatus ??= last.Status;
+                }
+            }
+            finally
+            {
+                throttle.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Historique indisponible pour la planification {Id}", planification.Id);
         }
     }
 

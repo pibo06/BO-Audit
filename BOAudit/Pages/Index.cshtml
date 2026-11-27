@@ -45,8 +45,8 @@
             }
         </span>
         <span class="ms-auto btn-group" role="group" aria-label="Choix de la vue">
-            <a asp-page="./Index" asp-route-view="cartes" class="btn btn-outline-secondary @(isRecipients || isPlanifications ? "" : "active")">Publications</a>
-            <a asp-page="./Index" asp-route-view="planifications" class="btn btn-outline-secondary @(isPlanifications ? "active" : "")">Planifications</a>
+            <a asp-page="./Index" asp-route-view="cartes" class="btn btn-outline-secondary btn-view-pub @(isRecipients || isPlanifications ? "" : "active")">Publications</a>
+            <a asp-page="./Index" asp-route-view="planifications" class="btn btn-outline-secondary btn-view-plan @(isPlanifications ? "active" : "")">Planifications</a>
             <a asp-page="./Index" asp-route-view="destinataires" class="btn btn-outline-secondary @(isRecipients ? "active" : "")">Destinataires</a>
         </span>
     </div>
@@ -64,7 +64,7 @@
                 @foreach (var planification in Model.Planifications)
                 {
                     <div class="col">
-                        <div class="card h-100 shadow-sm">
+                        <div class="card h-100 shadow-sm card-plan">
                             <div class="card-body">
                                 <h5 class="card-title">@planification.Name</h5>
                                 <p class="card-text small text-muted">
@@ -138,7 +138,7 @@
                 @foreach (var publication in Model.Publications)
                 {
                     <div class="col">
-                        <div class="card h-100 shadow-sm">
+                        <div class="card h-100 shadow-sm card-pub">
                             <div class="card-body">
                                 <h5 class="card-title">@publication.Name</h5>
                                 <p class="card-text small text-muted">
@@ -235,13 +235,13 @@
                                     @(recipient.DateSortie is { } sortie ? Display.Date(sortie) : "")
                                 </td>
                                 <td>
-                                    @foreach (var name in recipient.Publications)
+                                    @foreach (var publication in recipient.Publications)
                                     {
-                                        <span class="badge bg-light text-dark border">@name</span>
+                                        <a asp-page="/Publication/Detail" asp-route-id="@publication.Id" class="badge badge-pub">@publication.Name</a>
                                     }
-                                    @foreach (var name in recipient.Planifications)
+                                    @foreach (var planification in recipient.Planifications)
                                     {
-                                        <span class="badge bg-info text-dark">@name</span>
+                                        <a asp-page="/Planification/Detail" asp-route-id="@planification.Id" class="badge badge-plan">@planification.Name</a>
                                     }
                                     @if (recipient.Publications.Count == 0 && recipient.Planifications.Count == 0)
                                     {

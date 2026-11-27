@@ -1,0 +1,208 @@
+@page "{id:int}"
+@model DetailModel
+@using BOAudit.Models
+@{
+    ViewData["Title"] = Planification!.Name;
+}
+
+<div class="container">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-page="/Index">Suivi des publications BO</a></li>
+            @if (!string.IsNullOrEmpty(Planification.Folder))
+            {
+                <li class="breadcrumb-item">@Planification.Folder</li>
+            }
+            <li class="breadcrumb-item active" aria-current="page">@Planification.Name</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start mb-3">
+        <div>
+            <h1 class="h3 mb-1">@Planification.Name</h1>
+            <p class="text-muted mb-0">
+                @(string.IsNullOrEmpty(Planification.Description) ? "Pas de description" : Planification.Description)
+            </p>
+        </div>
+        <div class="text-end">
+            <a asp-page="/Index" class="btn btn-secondary">Retour</a>
+        </div>
+    </div>
+
+    @if (Planification.Error != null)
+    {
+        <div class="alert alert-warning">
+            Cette planification n'a pas été entièrement analysée lors du dernier rafraîchissement : @Planification.Error
+        </div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100 card-plan">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Échéance de planification</h2>
+                    <p class="h5">
+                        <span class="badge fs-6 @Display.ScheduleEndBadgeClass(Planification.EndTime)">
+                            @Display.ScheduleEndLabel(Planification.EndTime)
+                        </span>
+                    </p>
+                    @if (Planification.EndTime is { } end)
+                    {
+                        <p class="small mb-0">Fin de planification : @Display.Date(end)</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100 card-plan">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Récurrence et format</h2>
+                    <p class="small mb-1">@(Planification.Recurrence ?? "Non renseignée")</p>
+                    <p class="small mb-0">
+                        Format : @(Planification.Format ?? "—")
+                        @if (Planification.HasPrompts)
+                        {
+                            <span class="badge bg-light text-dark border" title="Le document comporte des invites">invites</span>
+                        }
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100 card-plan">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Dernière exécution</h2>
+                    @if (Planification.LastRunTime is { } last)
+                    {
+                        <p class="h5">
+                            <span class="badge fs-6 @Display.StatusBadgeClass(Planification.LastRunStatus)">
+                                @Display.StatusLabel(Planification.LastRunStatus)
+                            </span>
+                        </p>
+                        <p class="small mb-0">Dernière exécution : @Display.Date(last)</p>
+                    }
+                    else
+                    {
+                        <p class="h5 text-muted">Jamais exécutée</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100 card-plan">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Informations</h2>
+                    <ul class="list-unstyled small mb-0">
+                        <li>ID : @Planification.Id — CUID : @Planification.Cuid</li>
+                        <li>Auteur : @(string.IsNullOrEmpty(Planification.Author) ? "—" : Planification.Author)</li>
+                        <li>Type : Planification (Webi)</li>
+                        <li>Instances : @Planification.InstanceCount</li>
+                        <li>Dernière modification : @Display.Date(Planification.Updated)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Destinataires définis</div>
+                <div class="card-body">
+                    @if (Planification.UsesDynamicSmtpRecipients)
+                    {
+                        <h3 class="h6">Destinataires dynamiques</h3>
+                        <p class="small">Envoi SMTP aux destinataires dynamiques (%SI_EMAIL_ADDRESS%), résolus à chaque exécution.</p>
+                    }
+
+                    <h3 class="h6">@Planification.StaticEmails.Count destinataire(s) statique(s)</h3>
+                    @if (Planification.StaticEmails.Count > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>E-mail</th>
+                                        <th>Nom</th>
+                                        <th>Prénom</th>
+                                        <th>Sortie</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var recipient in Model.StaticRecipients)
+                                    {
+                                        // Destinataire absent de la vue [Vue_MailPro] : ligne mise en avant en orange.
+                                        <tr class="@(recipient.FoundInDatabase ? "" : "table-warning")">
+                                            <td>@recipient.Email</td>
+                                            <td>@(recipient.Nom ?? "—")</td>
+                                            <td>@(recipient.Prenom ?? "—")</td>
+                                            <td>
+                                                @(recipient.DateSortie is { } sortie ? Display.Date(sortie) : "")
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Aucune adresse e-mail statique configurée dans les destinations SMTP.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Historique des instances (20 dernières)</div>
+                <div class="card-body">
+                    @if (Planification.History.Count == 0)
+                    {
+                        <p class="text-muted small">Aucune instance — le document n'a jamais été exécuté.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Exécution</th>
+                                        <th>Instance</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var instance in Planification.History)
+                                    {
+                                        <tr>
+                                            <td>@Display.Date(instance.Updated)</td>
+                                            <td class="small">@instance.Name</td>
+                                            <td>
+                                                @if (instance.Status != null)
+                                                {
+                                                    <span class="badge @Display.StatusBadgeClass(instance.Status)">@Display.StatusLabel(instance.Status)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">—</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private BoPlanification Planification => Model.Planification!;
+}

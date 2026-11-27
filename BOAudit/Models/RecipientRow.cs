@@ -16,9 +16,9 @@ public sealed class RecipientRow
     /// <summary>True si une fiche Destinataire correspondante a été trouvée en base.</summary>
     public bool FoundInDatabase { get; set; }
 
-    /// <summary>Noms des publications envoyées à ce destinataire.</summary>
-    public List<string> Publications { get; set; } = new();
+    /// <summary>Publications envoyées à ce destinataire (id de détail + nom).</summary>
+    public List<EnvoiRef> Publications { get; set; } = new();
 
-    /// <summary>Noms des planifications envoyées à ce destinataire.</summary>
-    public List<string> Planifications { get; set; } = new();
+    /// <summary>Planifications envoyées à ce destinataire (id de détail + nom).</summary>
+    public List<EnvoiRef> Planifications { get; set; } = new();
 }

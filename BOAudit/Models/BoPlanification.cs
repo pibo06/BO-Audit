@@ -25,6 +25,12 @@ public sealed class BoPlanification
 
     public DateTime? LastRunTime { get; set; }
 
+    /// <summary>Statut de la dernière exécution (de l'historique des instances).</summary>
+    public string? LastRunStatus { get; set; }
+
+    /// <summary>Historique des 20 dernières instances (SI_STARTTIME, SI_ENDTIME, SI_SCHEDULE_STATUS).</summary>
+    public List<BoInstance> History { get; set; } = new();
+
     /// <summary>Fin de la planification (SCHEDULING_INFO / SI_ENDTIME) : sert de critère d'affichage.</summary>
     public DateTime? EndTime { get; set; }
 
