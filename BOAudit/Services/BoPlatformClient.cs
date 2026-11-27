@@ -1,3 +1,7 @@
+using Azure;
+using BOAudit.Models;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
 using System.Net.Http.Headers;
@@ -5,8 +9,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
-using BOAudit.Models;
-using Microsoft.Extensions.Options;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace BOAudit.Services;
 
@@ -40,7 +43,7 @@ public sealed class BoPlatformClient : IBoPlatformClient
         _settings = settings.Value;
         _logger = logger;
         _http.BaseAddress = new Uri(_settings.BaseUrl.TrimEnd('/') + "/");
-        _http.Timeout = TimeSpan.FromSeconds(10);
+        _http.Timeout = TimeSpan.FromMinutes(1);
     }
 
     public async Task<string> LogonAsync(CancellationToken ct = default)
@@ -66,6 +69,8 @@ public sealed class BoPlatformClient : IBoPlatformClient
         catch (Exception ex)
         {
             var t = ex.Message;
+            _logger.LogError("Send POST Logon request : {t}", t);
+
         }
 
         if (response != null)
@@ -87,11 +92,11 @@ public sealed class BoPlatformClient : IBoPlatformClient
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
             using var response = await _http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
-                _logger.LogWarning("Logoff BO en échec : {StatusCode}", response.StatusCode);
+                _logger.LogError("Logoff BO en échec : {StatusCode}", response.StatusCode);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Erreur lors du logoff BO (session abandonnée)");
+            _logger.LogError(ex, "Erreur lors du logoff BO (session abandonnée)");
         }
     }
 
@@ -116,7 +121,7 @@ public sealed class BoPlatformClient : IBoPlatformClient
 
     public async Task<List<JsonElement>> CmsQueryAsync(string token, string query, CancellationToken ct = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "biprws/v1/cmsquery")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "biprws/v1/cmsquery?page=1&pagesize=150")
         {
             Content = JsonContent.Create(new { query })
         };
@@ -143,12 +148,13 @@ public sealed class BoPlatformClient : IBoPlatformClient
     public async Task<List<JsonElement>> CmsQueryAllPagesAsync(string token, string query, CancellationToken ct = default)
     {
         var entries = new List<JsonElement>();
-        var next = await RunCmsQueryAsync(token, HttpMethod.Post, "biprws/v1/cmsquery", query, entries, ct);
+        var next = await RunCmsQueryAsync(token, HttpMethod.Post, "biprws/v1/cmsquery?page=1&pagesize=200", query, entries, ct);
 
         // Suit les pages suivantes renvoyées par le QueryBuilder (URI « next.__deferred »).
         for (var page = 2; next != null && page <= 100; page++)
-            next = await RunCmsQueryAsync(token, HttpMethod.Get, next, null, entries, ct);
-
+        {
+            next = await RunCmsQueryAsync(token, HttpMethod.Get, next, query, entries, ct);
+        }
         return entries;
     }
 

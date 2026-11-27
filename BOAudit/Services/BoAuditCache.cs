@@ -56,6 +56,7 @@ public sealed class BoAuditCache : IBoAuditCache
             try
             {
                 // Les planifications sont chargées en parallèle de l'enrichissement des publications.
+
                 var planificationsTask = LoadPlanificationsAsync(token, ct);
 
                 var publications = await CollectPublicationsAsync(token, ct);
@@ -70,7 +71,6 @@ public sealed class BoAuditCache : IBoAuditCache
                         _lastError = null;
                     }
                     Persist();
-                    await _bo.LogoffAsync(token, ct);
                     return new RefreshResult(false,
                         $"Aucune publication trouvée dans les dossiers publics (racine {_settings.PublicFoldersRootId})"
                         + $" ; {planificationsOnly.Count} planification(s) chargée(s).");
@@ -88,7 +88,6 @@ public sealed class BoAuditCache : IBoAuditCache
 
                 if (sorted.Count(p => !string.IsNullOrEmpty(p.Error)) == sorted.Count)
                 {
-                    await _bo.LogoffAsync(token, ct);
                     return new RefreshResult(false, "Aucune publication n'a pu être analysée (voir le détail des erreurs).");
                 }
 
@@ -103,7 +102,6 @@ public sealed class BoAuditCache : IBoAuditCache
                 var errors = sorted.Count(p => !string.IsNullOrEmpty(p.Error));
                 var message = $"{sorted.Count} publication(s) et {planifications.Count} planification(s) actualisée(s) le {DateTime.Now:dd/MM/yyyy HH:mm}."
                               + (errors > 0 ? $" {errors} publication(s) avec erreurs : ouvrez leur détail." : string.Empty);
-                await _bo.LogoffAsync(token, ct);
                 return new RefreshResult(true, message);
             }
             finally
@@ -383,7 +381,7 @@ public sealed class BoAuditCache : IBoAuditCache
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Historique indisponible pour la publication {Id}", publication.Id);
+            _logger.LogError(ex, "Historique indisponible pour la publication {Id}", publication.Id);
         }
     }
 
@@ -440,7 +438,7 @@ public sealed class BoAuditCache : IBoAuditCache
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Chargement des planifications en échec");
+            _logger.LogError(ex, "Chargement des planifications en échec");
             return new List<BoPlanification>();
         }
     }
@@ -455,7 +453,7 @@ public sealed class BoAuditCache : IBoAuditCache
             try
             {
                 var query = "SELECT TOP 20 SI_ID,SI_NAME,SI_STARTTIME,SI_ENDTIME,SI_SCHEDULE_STATUS FROM CI_INFOOBJECTS "
-                            + $"WHERE SI_INSTANCE=1 AND SI_KIND = 'Webi' AND SI_ANCESTOR = {planification.Id}";
+                            + $"WHERE SI_INSTANCE=1 AND SI_KIND in ('Webi','Pdf') AND SI_PARENTID = {planification.Id}";
                 var entries = await _bo.CmsQueryAsync(token, query, ct);
 
                 planification.History = entries
@@ -478,7 +476,7 @@ public sealed class BoAuditCache : IBoAuditCache
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Historique indisponible pour la planification {Id}", planification.Id);
+            _logger.LogError(ex, "Historique indisponible pour la planification {Id}", planification.Id);
         }
     }
 
@@ -543,7 +541,7 @@ public sealed class BoAuditCache : IBoAuditCache
             {
                 var doss = string.Join(",", chunk);
                 names[chunk[0]] = $"Dossier(s) {doss} - non trouvé dans la CMC /!\\";
-                _logger.LogWarning(ex, "Résolution des noms de dossiers en échec pour {Count} dossier(s)", chunk.Length);
+                _logger.LogError(ex, "Résolution des noms de dossiers en échec pour {Count} dossier(s)", chunk.Length);
             }
         }
 
