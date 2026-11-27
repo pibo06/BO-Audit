@@ -302,7 +302,7 @@ public sealed class BoAuditCache : IBoAuditCache
 
     /// <summary>Nettoie les adresses brutes (trim, ignore les vides) ; logique partagée par les deux collectes.</summary>
     private static IEnumerable<string> NormalizeAddresses(IEnumerable<string> addresses)
-        => addresses.Select(a => a.Trim()).Where(a => a.Length > 0);
+        => addresses.Select(a => a.Trim().ToLower()).Where(a => a.Length > 0);
 
     /// <summary>Résout le nom (et le lien OpenDocument) des rapports liés à la publication, et pour les
     /// destinataires dynamiques le nom et le dossier de chaque rapport source (requêtes infostore).</summary>
