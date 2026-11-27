@@ -210,7 +210,6 @@
                             <th>E-mail</th>
                             <th>Nom</th>
                             <th>Prénom</th>
-                            <th>Matricule RH</th>
                             <th>Base RH</th>
                             <th>Sorti</th>
                             <th>Publications / Planifications</th>
@@ -219,11 +218,20 @@
                     <tbody>
                         @foreach (var recipient in Model.Recipients)
                         {
-                            <tr>
+                            // Destinataire absent de la vue [Vue_MailPro] : ligne mise en avant en orange.
+                            <tr class="@(recipient.FoundInDatabase ? "" : "table-warning")">
                                 <td>@recipient.Email</td>
-                                <td>@(recipient.Nom ?? "—")</td>
+                                <td>
+                                    @if (recipient.FoundInDatabase)
+                                    {
+                                        @(string.IsNullOrEmpty(recipient.Nom) ? "—" : recipient.Nom)
+                                    }
+                                    else
+                                    {
+                                        <strong class="text-warning-emphasis">Non trouvé en base</strong>
+                                    }
+                                </td>
                                 <td>@(recipient.Prenom ?? "—")</td>
-                                <td>@(recipient.MatriculeRh ?? "—")</td>
                                 <td>
                                     @if (recipient.FoundInDatabase)
                                     {
@@ -231,7 +239,7 @@
                                     }
                                     else
                                     {
-                                        <span class="badge bg-warning text-dark">Non trouvé en base</span>
+                                        <span class="badge bg-warning text-dark">Non trouvé</span>
                                     }
                                 </td>
                                 <td>
@@ -239,19 +247,29 @@
                                     {
                                         <span class="badge bg-danger">Oui</span>
                                     }
-                                    else
+                                    else if (recipient.Sorti == false)
                                     {
                                         <span class="badge bg-secondary">Non</span>
                                     }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
                                 </td>
                                 <td>
-                                    @foreach (var name in recipient.Publications)
+                                    @if (recipient.Publications.Count > 0)
                                     {
-                                        <span class="badge bg-light text-dark border">@name</span>
+                                        <div class="small mb-1">
+                                            <strong>Publications (@recipient.Publications.Count) :</strong>
+                                            @string.Join(" · ", recipient.Publications)
+                                        </div>
                                     }
-                                    @foreach (var name in recipient.Planifications)
+                                    @if (recipient.Planifications.Count > 0)
                                     {
-                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">@name</span>
+                                        <div class="small mb-1">
+                                            <strong class="text-primary">Planifications (@recipient.Planifications.Count) :</strong>
+                                            @string.Join(" · ", recipient.Planifications)
+                                        </div>
                                     }
                                     @if (recipient.Publications.Count == 0 && recipient.Planifications.Count == 0)
                                     {

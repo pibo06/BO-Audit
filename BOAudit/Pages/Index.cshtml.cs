@@ -1,4 +1,3 @@
-using System.Globalization;
 using BOAudit.Data;
 using BOAudit.Models;
 using BOAudit.Services;
@@ -72,18 +71,18 @@ public class IndexModel(
         if (rows.Count == 0) return new List<RecipientRow>();
 
         var emails = rows.Keys.ToList();
-        var fiches = await db.Destinataires
-            .Where(d => emails.Contains(d.Email))
-            .ToDictionaryAsync(d => d.Email.Trim().ToLower(CultureInfo.InvariantCulture), d => d, CancellationToken.None);
+        var fiches = await db.MailPros
+            .Where(m => emails.Contains(m.MailPro))
+            .ToListAsync(CancellationToken.None);
+        var fichesParEmail = fiches.ToDictionary(m => m.MailPro.Trim(), m => m, StringComparer.OrdinalIgnoreCase);
 
         foreach (var (email, row) in rows)
         {
-            if (fiches.TryGetValue(email.Trim().ToLower(CultureInfo.InvariantCulture), out var fiche))
+            if (fichesParEmail.TryGetValue(email.Trim(), out var fiche))
             {
                 row.Nom = fiche.Nom;
                 row.Prenom = fiche.Prenom;
-                row.MatriculeRh = fiche.MatriculeRh;
-                row.Sorti = fiche.Sorti;
+                row.Sorti = fiche.DateSortie.HasValue;
                 row.FoundInDatabase = true;
             }
         }

@@ -6,10 +6,9 @@ public sealed class RecipientRow
 {
     public string Email { get; set; } = string.Empty;
 
-    /// <summary>Nom issu de la base SQL, sinon "Non trouvé en base".</summary>
+    /// <summary>Nom issu de la vue [Vue_MailPro], sinon "Non trouvé en base".</summary>
     public string? Nom { get; set; }
     public string? Prenom { get; set; }
-    public string? MatriculeRh { get; set; }
     public bool? Sorti { get; set; }
 
     /// <summary>True si une fiche Destinataire correspondante a été trouvée en base.</summary>

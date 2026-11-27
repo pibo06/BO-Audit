@@ -182,22 +182,21 @@
                                         <th>E-mail</th>
                                         <th>Nom</th>
                                         <th>Prénom</th>
-                                        <th>Matricule RH</th>
                                         <th>Sorti</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var recipient in Model.StaticRecipients)
                                     {
-                                        <tr>
+                                        // Destinataire absent de la vue [Vue_MailPro] : ligne mise en avant en orange.
+                                        <tr class="@(recipient.FoundInDatabase ? "" : "table-warning")">
                                             <td>@recipient.Email</td>
                                             <td>@(recipient.Nom ?? "—")</td>
                                             <td>@(recipient.Prenom ?? "—")</td>
-                                            <td>@(recipient.MatriculeRh ?? "—")</td>
                                             <td>
                                                 @if (!recipient.FoundInDatabase)
                                                 {
-                                                    <span class="badge bg-warning text-dark">Non trouvé en base</span>
+                                                    <span class="badge bg-warning text-dark">Non trouvé</span>
                                                 }
                                                 else if (recipient.Sorti == true)
                                                 {

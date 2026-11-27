@@ -74,21 +74,6 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 
-// En développement : crée automatiquement la base et la table des destinataires
-// (sans bloquer le démarrage si SQL Server est momentanément inaccessible).
-if (app.Environment.IsDevelopment())
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    try
-    {
-        db.Database.EnsureCreated();
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning(ex,
-            "Base des destinataires injoignable au démarrage : créez-la avant d'utiliser l'enrichissement des e-mails.");
-    }
-}
+// La vue [Vue_MailPro] existe déjà dans la base DEV (lecture seule) : aucun schéma n'est créé au démarrage.
 
 app.Run();
