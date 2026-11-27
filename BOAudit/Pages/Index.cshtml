@@ -111,6 +111,7 @@
                                         <li class="text-danger">Erreur : @planification.Error</li>
                                     }
                                 </ul>
+                                <a asp-page="/Planification/Detail" asp-route-id="@planification.Id" class="btn btn-sm btn-primary">Voir le détail</a>
                             </div>
                             <div class="card-footer small text-muted">
                                 @if (!string.IsNullOrEmpty(planification.Folder))
