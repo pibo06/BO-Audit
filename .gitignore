@@ -362,3 +362,4 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /BOAudit/wwwroot/lib/bootstrap/LICENSE
+/BOAudit/App_Data/bo-cache.json
