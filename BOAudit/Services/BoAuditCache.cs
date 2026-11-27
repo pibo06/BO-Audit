@@ -444,7 +444,9 @@ public sealed class BoAuditCache : IBoAuditCache
     }
 
     /// <summary>Historique des instances d'un document planifié : requête cmsquery SI_ANCESTOR
-    /// renvoyant les 20 dernières instances avec SI_STARTTIME, SI_ENDTIME et SI_SCHEDULE_STATUS.</summary>
+    /// renvoyant les 20 dernières instances avec SI_STARTTIME, SI_ENDTIME et SI_SCHEDULE_STATUS.
+    /// Certaines planifications ne portent pas leurs destinataires : ils ne figurent que dans le
+    /// SCHEDULING_INFO/SI_DESTINATIONS des instances ; on récupère ceux de la dernière instance qui en définit.</summary>
     private async Task LoadPlanificationHistoryAsync(string token, BoPlanification planification, SemaphoreSlim throttle, CancellationToken ct)
     {
         try
@@ -452,15 +454,54 @@ public sealed class BoAuditCache : IBoAuditCache
             await throttle.WaitAsync(ct);
             try
             {
-                var query = "SELECT TOP 20 SI_ID,SI_NAME,SI_STARTTIME,SI_ENDTIME,SI_SCHEDULE_STATUS FROM CI_INFOOBJECTS "
-                            + $"WHERE SI_INSTANCE=1 AND SI_KIND in ('Webi','Pdf') AND SI_PARENTID = {planification.Id}";
-                var entries = await _bo.CmsQueryAsync(token, query, ct);
+                const string select = "SELECT TOP 20 SI_ID,SI_NAME,SI_STARTTIME,SI_ENDTIME,SI_SCHEDULE_STATUS";
+                var where = $"WHERE SI_INSTANCE=1 AND SI_KIND in ('Webi','Pdf') AND SI_PARENTID = {planification.Id}";
+
+                List<JsonElement> entries;
+                try
+                {
+                    entries = await _bo.CmsQueryAsync(token, select + ",SCHEDULING_INFO.SI_DESTINATIONS FROM CI_INFOOBJECTS " + where, ct);
+                }
+                catch (Exception ex)
+                {
+                    // Certains CMS refusent les propriétés imbriquées dans le SELECT : nouvelle tentative sans.
+                    _logger.LogDebug(ex, "Requête avec destinations refusée pour la planification {Id}", planification.Id);
+                    entries = await _bo.CmsQueryAsync(token, select + " FROM CI_INFOOBJECTS " + where, ct);
+                }
+
+                // Destinataires effectifs par instance (destinations SMTP du SCHEDULING_INFO de l'instance).
+                var emailsParInstance = new Dictionary<int, List<string>>();
+                foreach (var entry in entries)
+                {
+                    var id = (int?)GetNumber(entry, "SI_ID") ?? 0;
+                    if (id == 0) continue;
+                    var emails = new List<string>();
+                    foreach (var destination in ReadArray(entry, "SCHEDULING_INFO", "SI_DESTINATIONS"))
+                    {
+                        if (!destination.TryGetProperty("SI_DEST_SCHEDULEOPTIONS", out var options)) continue;
+                        emails.AddRange(ReadValues(options, "SI_MAIL_ADDRESSES"));
+                        emails.AddRange(ReadValues(options, "SI_MAIL_CC"));
+                    }
+                    emailsParInstance[id] = emails;
+                }
 
                 planification.History = entries
                     .Select(ParseInstance)
                     .Where(i => i.Id != 0)
                     .OrderByDescending(i => i.StartTime ?? i.EndTime)
                     .ToList();
+
+                // Destinataires de la dernière instance qui en définit (les plus récents en vigueur),
+                // en ne retenant que les instances à EndTime future ou dépassée de moins de 30 jours.
+                var minEndTime = DateTime.Now.AddDays(-30);
+                foreach (var instance in planification.History)
+                {
+                    var runTime = instance.EndTime ?? instance.StartTime;
+                    if (runTime is not { } time || time < minEndTime) continue;
+                    if (!emailsParInstance.TryGetValue(instance.Id, out var emails) || emails.Count == 0) continue;
+                    CollectStaticEmails(planification, emails);
+                    break;
+                }
 
                 var last = planification.History.FirstOrDefault();
                 if (last != null)
@@ -476,7 +517,7 @@ public sealed class BoAuditCache : IBoAuditCache
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Historique indisponible pour la planification {Id}", planification.Id);
+            _logger.LogWarning(ex, "Historique indisponible pour la planification {Id}", planification.Id);
         }
     }
 
