@@ -414,8 +414,7 @@ public sealed class BoAuditCache : IBoAuditCache
     {
         try
         {
-            var query = "SELECT * FROM CI_INFOOBJECTS WHERE SI_HIDDEN_OBJECT=0 AND SI_IS_SCHEDULABLE=-1 "
-                        + "AND SI_KIND='Webi' AND SI_LAST_SUCCESSFUL_INSTANCE_ID>0";
+            var query = "SELECT * FROM CI_INFOOBJECTS WHERE SI_HIDDEN_OBJECT=0 AND SI_IS_SCHEDULABLE=-1 AND SI_KIND='Webi' AND SI_LAST_SUCCESSFUL_INSTANCE_ID>0";
             var entries = await _bo.CmsQueryAllPagesAsync(token, query, ct);
 
             var minEndTime = DateTime.Now.AddDays(-30);
@@ -542,6 +541,8 @@ public sealed class BoAuditCache : IBoAuditCache
             }
             catch (Exception ex)
             {
+                var doss = string.Join(",", chunk);
+                names[chunk[0]] = $"Dossier(s) {doss} - non trouvé dans la CMC /!\\";
                 _logger.LogWarning(ex, "Résolution des noms de dossiers en échec pour {Count} dossier(s)", chunk.Length);
             }
         }
