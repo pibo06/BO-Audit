@@ -60,63 +60,68 @@
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>Document</th>
-                            <th>Dossier</th>
-                            <th>Auteur</th>
-                            <th>Instances</th>
-                            <th>Récurrence</th>
-                            <th>Dernière exécution</th>
-                            <th>Format</th>
-                            <th>Destinataires</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var planification in Model.Planifications)
-                        {
-                            <tr>
-                                <td>
-                                    <strong>@planification.Name</strong>
-                                    @if (planification.HasPrompts)
-                                    {
-                                        <span class="badge bg-light text-dark border" title="Le document comporte des invites">invites</span>
-                                    }
+            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+                @foreach (var planification in Model.Planifications)
+                {
+                    <div class="col">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title">@planification.Name</h5>
+                                <p class="card-text small text-muted">
+                                    @(string.IsNullOrEmpty(planification.Description) ? "Pas de description" : planification.Description)
+                                </p>
+                                <ul class="list-unstyled small mb-2">
+                                    <li>
+                                        <span class="badge @Display.ScheduleEndBadgeClass(planification.EndTime)">
+                                            @Display.ScheduleEndLabel(planification.EndTime)@(planification.EndTime is { } end ? $" : {Display.Date(end)}" : "")
+                                        </span>
+                                    </li>
+                                    <li>
+                                        Récurrence : @(planification.Recurrence ?? "—")
+                                    </li>
+                                    <li>
+                                        Dernière exécution :
+                                        @(planification.LastRunTime is { } lastRun ? Display.Date(lastRun) : "jamais")
+                                        (@planification.InstanceCount instance(s))
+                                    </li>
+                                    <li>
+                                        Format : @(planification.Format ?? "—")
+                                        @if (planification.HasPrompts)
+                                        {
+                                            <span class="badge bg-light text-dark border" title="Le document comporte des invites">invites</span>
+                                        }
+                                    </li>
+                                    <li>
+                                        Destinataires :
+                                        @if (planification.UsesDynamicSmtpRecipients)
+                                        {
+                                            <span class="badge bg-info text-dark">dynamiques</span>
+                                        }
+                                        @if (planification.StaticEmails.Count > 0)
+                                        {
+                                            <text>@planification.StaticEmails.Count</text>
+                                        }
+                                        @if (!planification.UsesDynamicSmtpRecipients && planification.StaticEmails.Count == 0)
+                                        {
+                                            <text>—</text>
+                                        }
+                                    </li>
                                     @if (planification.Error != null)
                                     {
-                                        <div class="small text-danger">Erreur : @planification.Error</div>
+                                        <li class="text-danger">Erreur : @planification.Error</li>
                                     }
-                                </td>
-                                <td>@(planification.Folder ?? "—")</td>
-                                <td>@(string.IsNullOrEmpty(planification.Author) ? "—" : planification.Author)</td>
-                                <td>@planification.InstanceCount</td>
-                                <td>@(planification.Recurrence ?? "—")</td>
-                                <td>@(planification.LastRunTime is { } lastRun ? Display.Date(lastRun) : "jamais")</td>
-                                <td>@(planification.Format ?? "—")</td>
-                                <td>
-                                    @if (planification.UsesDynamicSmtpRecipients)
-                                    {
-                                        <span class="badge bg-info text-dark">dynamiques</span>
-                                    }
-                                    @foreach (var email in planification.StaticEmails.Take(3))
-                                    {
-                                        <span class="badge bg-light text-dark border">@email</span>
-                                    }
-                                    @if (planification.StaticEmails.Count > 3)
-                                    {
-                                        <span class="text-muted small">+@(planification.StaticEmails.Count - 3)</span>
-                                    }
-                                    @if (!planification.UsesDynamicSmtpRecipients && planification.StaticEmails.Count == 0)
-                                    {
-                                        <span class="text-muted">—</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                </ul>
+                            </div>
+                            <div class="card-footer small text-muted">
+                                @if (!string.IsNullOrEmpty(planification.Folder))
+                                {
+                                    <text>Dossier : <strong>@planification.Folder</strong> — </text>
+                                }
+                                Auteur : @(string.IsNullOrEmpty(planification.Author) ? "—" : planification.Author) — Modifié : @Display.Date(planification.Updated)
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
         }
     }

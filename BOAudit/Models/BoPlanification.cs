@@ -1,7 +1,8 @@
 namespace BOAudit.Models;
 
 /// <summary>
-/// Planification BO : document Webi planifié (SI_INSTANCE = 0, SI_KIND = 'Webi', SI_CHILDREN &gt; 0),
+/// Planification BO : document Webi planifié (SI_HIDDEN_OBJECT = 0, SI_IS_SCHEDULABLE = -1,
+/// SI_KIND = 'Webi', SI_LAST_SUCCESSFUL_INSTANCE_ID &gt; 0),
 /// avec sa récurrence, son format de sortie, ses destinataires SMTP et son état de dernière exécution.
 /// </summary>
 public sealed class BoPlanification
@@ -23,6 +24,9 @@ public sealed class BoPlanification
     public int InstanceCount { get; set; }
 
     public DateTime? LastRunTime { get; set; }
+
+    /// <summary>Fin de la planification (SCHEDULING_INFO / SI_ENDTIME) : sert de critère d'affichage.</summary>
+    public DateTime? EndTime { get; set; }
 
     /// <summary>Description de la récurrence (type de planification + jours du modèle éventuel).</summary>
     public string? Recurrence { get; set; }

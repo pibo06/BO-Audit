@@ -20,4 +20,21 @@ public static class Display
     }
 
     public static string StatusLabel(string? status) => string.IsNullOrWhiteSpace(status) ? "Inconnu" : status.Trim();
+
+    /// <summary>Classe du badge d'échéance d'une planification selon SI_ENDTIME :
+    /// rouge si dépassée, orange si dans le mois qui suit, vert sinon ; neutre si absente.</summary>
+    public static string ScheduleEndBadgeClass(DateTime? endTime)
+    {
+        if (endTime is null) return "bg-secondary";
+        if (endTime.Value < DateTime.Now) return "bg-danger";
+        if (endTime.Value <= DateTime.Now.AddDays(30)) return "bg-warning text-dark";
+        return "bg-success";
+    }
+
+    /// <summary>Libellé du badge d'échéance d'une planification (SI_ENDTIME).</summary>
+    public static string ScheduleEndLabel(DateTime? endTime)
+    {
+        if (endTime is null) return "Pas d'échéance";
+        return endTime.Value < DateTime.Now ? "Planification dépassée" : "Échéance";
+    }
 }

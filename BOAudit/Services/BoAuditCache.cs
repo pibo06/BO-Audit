@@ -405,19 +405,28 @@ public sealed class BoAuditCache : IBoAuditCache
     }
 
     /// <summary>Charge les planifications : documents Webi planifiés (méthode « Planifications » du document de
-    /// référence : SI_INSTANCE = 0, SI_KIND = 'Webi', SI_CHILDREN &gt; 0), avec récurrence, format et destinataires.</summary>
+    /// référence : SI_HIDDEN_OBJECT = 0, SI_IS_SCHEDULABLE = -1, SI_KIND = 'Webi', SI_LAST_SUCCESSFUL_INSTANCE_ID &gt; 0),
+    /// avec récurrence, format et destinataires. Les documents dont SCHEDULING_INFO/SI_ENDTIME est
+    /// antérieure à 30 jours par rapport à la date du jour sont ignorés.</summary>
     private async Task<List<BoPlanification>> LoadPlanificationsAsync(string token, CancellationToken ct)
     {
         try
         {
-            var query = "SELECT * FROM CI_INFOOBJECTS WHERE SI_INSTANCE = 0 AND SI_KIND = 'Webi' AND SI_CHILDREN > 0";
+            var query = "SELECT * FROM CI_INFOOBJECTS WHERE SI_HIDDEN_OBJECT=0 AND SI_IS_SCHEDULABLE=-1 "
+                        + "AND SI_KIND='Webi' AND SI_LAST_SUCCESSFUL_INSTANCE_ID>0";
             var entries = await _bo.CmsQueryAllPagesAsync(token, query, ct);
 
+            var minEndTime = DateTime.Now.AddDays(-30);
             var planifications = new List<BoPlanification>();
             foreach (var entry in entries)
             {
                 var planification = ParsePlanification(entry);
-                if (planification.Id != 0) planifications.Add(planification);
+                if (planification.Id == 0) continue;
+
+                // Les planifications échues depuis plus de 30 jours ne sont plus actives : on les écarte.
+                if (planification.EndTime is { } end && end < minEndTime) continue;
+
+                planifications.Add(planification);
             }
 
             await ResolveFolderNamesAsync(token, planifications, ct);
@@ -444,6 +453,7 @@ public sealed class BoAuditCache : IBoAuditCache
             Updated = BoPlatformClient.ParseBoDate(GetString(entry, "SI_UPDATE_TS")),
             InstanceCount = (int?)GetNumber(entry, "SI_CHILDREN") ?? 0,
             LastRunTime = BoPlatformClient.ParseBoDate(GetString(entry, "SI_LAST_RUN_TIME")),
+            EndTime = BoPlatformClient.ParseBoDate(GetString(entry, "SCHEDULING_INFO", "SI_ENDTIME")),
             ParentFolderId = (int?)GetNumber(entry, "SI_PARENT_FOLDER"),
             Recurrence = DescribeRecurrence(entry),
             Format = GetString(entry, "PROCESSING_INFO", "SI_FORMAT_INFO", "SI_FORMAT")
