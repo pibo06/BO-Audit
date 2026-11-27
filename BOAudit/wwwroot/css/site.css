@@ -20,3 +20,45 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+/* ---- Codes couleur : publications en bleu pâle, planifications en marron pâle ---- */
+
+.pub-fond { background-color: #e1edfa; }
+.plan-fond { background-color: #f0e6d9; }
+
+/* Cards : fond teinté + bordure supérieure plus soutenue */
+.card-pub {
+  background-color: #e1edfa;
+  border-top: 4px solid #8fb4e0;
+}
+
+.card-plan {
+  background-color: #f0e6d9;
+  border-top: 4px solid #c2a077;
+}
+
+/* Boutons de raccourci (choix de la vue), état actif */
+.btn-view-pub.active {
+  background-color: #cfe1f7;
+  border-color: #8fb4e0;
+  color: #173a5e;
+}
+
+.btn-view-plan.active {
+  background-color: #ecdfcd;
+  border-color: #c2a077;
+  color: #4d371c;
+}
+
+/* Badges de la liste des destinataires */
+.badge-pub {
+  background-color: #e1edfa;
+  color: #173a5e;
+  border: 1px solid #8fb4e0;
+}
+
+.badge-plan {
+  background-color: #f0e6d9;
+  color: #4d371c;
+  border: 1px solid #c2a077;
+}
