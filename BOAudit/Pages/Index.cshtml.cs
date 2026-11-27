@@ -43,7 +43,8 @@ public class IndexModel(
         return RedirectToPage(new { view = View });
     }
 
-    /// <summary>Rassemble tous les e-mails référencés dans les publications et les complète avec la base SQL (EF).</summary>
+    /// <summary>Rassemble tous les e-mails référencés dans les publications et les planifications,
+    /// et les complète avec la base SQL (EF).</summary>
     private async Task<List<RecipientRow>> BuildRecipientsAsync()
     {
         var rows = new Dictionary<string, RecipientRow>(StringComparer.OrdinalIgnoreCase);
@@ -55,6 +56,16 @@ public class IndexModel(
                 if (!rows.TryGetValue(email, out var row))
                     rows[email] = row = new RecipientRow { Email = email };
                 row.Publications.Add(publication.Name);
+            }
+        }
+
+        foreach (var planification in cache.Planifications)
+        {
+            foreach (var email in planification.StaticEmails)
+            {
+                if (!rows.TryGetValue(email, out var row))
+                    rows[email] = row = new RecipientRow { Email = email };
+                row.Planifications.Add(planification.Name);
             }
         }
 

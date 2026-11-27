@@ -198,8 +198,8 @@
         // ---- Vue destinataires référencés dans les publications ----
         @if (Model.Recipients.Count == 0)
         {
-            <div class="alert alert-info">Aucun destinataire e-mail statique identifié dans les publications.
-                Lancez d'abord un rafraîchissement, ou les publications utilisent uniquement des destinataires dynamiques (voir leurs détails).</div>
+            <div class="alert alert-info">Aucun destinataire e-mail statique identifié dans les publications ni dans les planifications.
+                Lancez d'abord un rafraîchissement, ou les envois utilisent uniquement des destinataires dynamiques (voir leurs détails).</div>
         }
         else
         {
@@ -213,7 +213,7 @@
                             <th>Matricule RH</th>
                             <th>Base RH</th>
                             <th>Sorti</th>
-                            <th>Publications</th>
+                            <th>Publications / Planifications</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -245,13 +245,17 @@
                                     }
                                 </td>
                                 <td>
-                                    @foreach (var name in recipient.Publications.Take(3))
+                                    @foreach (var name in recipient.Publications)
                                     {
                                         <span class="badge bg-light text-dark border">@name</span>
                                     }
-                                    @if (recipient.Publications.Count > 3)
+                                    @foreach (var name in recipient.Planifications)
                                     {
-                                        <span class="text-muted small">+@(recipient.Publications.Count - 3)</span>
+                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">@name</span>
+                                    }
+                                    @if (recipient.Publications.Count == 0 && recipient.Planifications.Count == 0)
+                                    {
+                                        <span class="text-muted">—</span>
                                     }
                                 </td>
                             </tr>
